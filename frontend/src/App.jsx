@@ -6,16 +6,17 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import OfficerLogin from './pages/OfficerLogin';
 import FarmerChat from './pages/FarmerChat';
+import FarmerDashboard from './pages/FarmerDashboard';
 import { Globe } from 'lucide-react';
 
 const Navbar = () => {
   const location = useLocation();
   const isOfficer = location.pathname.includes('officer');
-  const isFarmer = location.pathname.includes('farmer') || location.pathname.includes('chat');
+  const isFarmer = location.pathname.includes('farmer') || location.pathname.includes('chat') || location.pathname.includes('dashboard');
   const { lang, changeLanguage, t } = useLanguage();
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-xs border-b border-gray-200">
+    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-xs border-b border-gray-200 transition-colors">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Logo & Portal Identity */}
@@ -54,6 +55,7 @@ const Navbar = () => {
               </select>
             </div>
 
+
             {/* Home Navigation Link */}
             <Link 
               to="/" 
@@ -72,24 +74,25 @@ function App() {
   return (
     <LanguageProvider>
       <Router>
-        <div className="min-h-screen bg-gray-100">
-          <Navbar />
-          <main>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              
-              {/* Officer Flow */}
-              <Route path="/officer-login" element={<OfficerLogin />} />
-              <Route path="/officer-dashboard" element={<Dashboard />} />
-              
-              {/* Farmer Flow */}
-              <Route path="/farmer-login" element={<Login />} />
-              <Route path="/chat" element={<FarmerChat />} />
-            </Routes>
-          </main>
-        </div>
-      </Router>
-    </LanguageProvider>
+        <div className="min-h-screen bg-gray-100 transition-colors text-gray-900">
+            <Navbar />
+            <main>
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                
+                {/* Officer Flow */}
+                <Route path="/officer-login" element={<OfficerLogin />} />
+                <Route path="/officer-dashboard" element={<Dashboard />} />
+                
+                {/* Farmer Flow */}
+                <Route path="/farmer-login" element={<Login />} />
+                <Route path="/chat" element={<FarmerChat />} />
+                <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
+              </Routes>
+            </main>
+          </div>
+        </Router>
+      </LanguageProvider>
   );
 }
 

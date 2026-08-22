@@ -97,7 +97,7 @@ import time
 import secrets
 import random
 
-from services.sms_service import send_otp_sms
+from services.sms_service import send_otp_sms, send_sms
 
 # In-memory OTP Cache: { (phone, role): {"otp": str, "expires_at": float, "attempts": int, "last_sent_at": float} }
 OTP_STORE = {}
@@ -111,8 +111,8 @@ def send_alert(farmer_id: int, db: Session = Depends(database.get_db)):
     if not db_farmer:
         raise HTTPException(status_code=404, detail="Farmer not found")
         
-    print(f"--- MOCK SMS ALERT SENT TO {db_farmer.phone} ---")
-    print(f"Message: You have been identified as high distress risk. An agricultural officer will contact you shortly.")
+    message = "SmartCrop Alert: You have been identified as high distress risk. An agricultural officer will contact you shortly."
+    send_sms(db_farmer.phone, message, role="farmer")
     
     return {"status": "Alert sent successfully"}
 

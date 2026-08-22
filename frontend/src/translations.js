@@ -63,7 +63,35 @@ export const translations = {
     loading_dashboard: "Loading dashboard...",
     fetch_error: "Failed to fetch dashboard data. Make sure backend is running.",
     alert_sent: "Alert sent successfully!",
-    alert_failed: "Failed to send alert."
+    alert_failed: "Failed to send alert.",
+    
+    // Dashboard Advisory
+    advisory_title: "Smart Crop Advisory",
+    crop: "Crop",
+    rice: "Rice",
+    weather: "Weather",
+    rain_expected: "Rain expected",
+    todays_advisory: "TODAY'S ADVISORY",
+    heavy_rain_expected: "Heavy rain is expected.",
+    delay_irrigation: "Delay irrigation today.",
+    listen: "Listen",
+    mandi_prices: "Mandi Prices",
+    distress_risk: "DISTRESS RISK",
+    moderate: "Moderate",
+
+    // Weather Widget
+    humidity: "Humidity",
+    wind: "Wind",
+    precipitation: "Precipitation",
+    temperature: "Temperature",
+    sun: "Sun",
+    mon: "Mon",
+    tue: "Tue",
+    wed: "Wed",
+    thu: "Thu",
+    fri: "Fri",
+    sat: "Sat",
+    today: "Today"
   },
   hi: {
     welcome: "स्मार्टक्रॉप में आपका स्वागत है",
@@ -129,7 +157,35 @@ export const translations = {
     loading_dashboard: "डैशबोर्ड लोड हो रहा है...",
     fetch_error: "डैशबोर्ड डेटा प्राप्त करने में विफल। सुनिश्चित करें कि बैकएंड चल रहा है।",
     alert_sent: "अलर्ट सफलतापूर्वक भेजा गया!",
-    alert_failed: "अलर्ट भेजने में विफल।"
+    alert_failed: "अलर्ट भेजने में विफल।",
+    
+    // Dashboard Advisory
+    advisory_title: "स्मार्ट क्रॉप सलाहकार",
+    crop: "फसल",
+    rice: "धान",
+    weather: "मौसम",
+    rain_expected: "बारिश की संभावना",
+    todays_advisory: "आज की सलाह",
+    heavy_rain_expected: "भारी बारिश की संभावना है।",
+    delay_irrigation: "आज सिंचाई स्थगित करें।",
+    listen: "सुनें",
+    mandi_prices: "मंडी के भाव",
+    distress_risk: "संकट जोखिम",
+    moderate: "मध्यम",
+
+    // Weather Widget
+    humidity: "नमी",
+    wind: "हवा",
+    precipitation: "वर्षा",
+    temperature: "तापमान",
+    sun: "रवि",
+    mon: "सोम",
+    tue: "मंगल",
+    wed: "बुध",
+    thu: "गुरु",
+    fri: "शुक्र",
+    sat: "शनि",
+    today: "आज"
   },
   or: {
     welcome: "ସ୍ମାର୍ଟକ୍ରପ୍ କୁ ସ୍ୱାଗତ",
@@ -195,6 +251,34 @@ export const translations = {
     loading_dashboard: "ଡ୍ୟାସବୋର୍ଡ ଲୋଡ୍ ହେଉଛି...",
     fetch_error: "ଡ୍ୟାସବୋର୍ଡ ତଥ୍ୟ ଆଣିବାରେ ବିଫଳ | ନିଶ୍ଚିତ କରନ୍ତୁ ଯେ ବ୍ୟାକଏଣ୍ଡ୍ ଚାଲୁଛି |",
     alert_sent: "ସତର୍କ ସୂଚନା ସଫଳତାର ସହିତ ପଠାଯାଇଛି!",
-    alert_failed: "ସତର୍କ ସୂଚନା ପଠାଇବାରେ ବିଫଳ |"
+    alert_failed: "ସତର୍କ ସୂଚନା ପଠାଇବାରେ ବିଫଳ |",
+    
+    // Dashboard Advisory
+    advisory_title: "ସ୍ମାର୍ଟ ଫସଲ ପରାମର୍ଶ",
+    crop: "ଫସଲ",
+    rice: "ଧାନ",
+    weather: "ପାଣିପାଗ",
+    rain_expected: "ବର୍ଷା ଆଶା କରାଯାଉଛି",
+    todays_advisory: "ଆଜିର ପରାମର୍ଶ",
+    heavy_rain_expected: "ପ୍ରବଳ ବର୍ଷା ହେବାର ସମ୍ଭାବନା ଅଛି |",
+    delay_irrigation: "ଆଜି ଜଳସେଚନ ବିଳମ୍ବ କରନ୍ତୁ |",
+    listen: "ଶୁଣନ୍ତୁ",
+    mandi_prices: "ମଣ୍ଡି ଦର",
+    distress_risk: "ସଙ୍କଟ ବିପଦ",
+    moderate: "ମଧ୍ୟମ",
+    
+    // Weather Widget
+    humidity: "ଆର୍ଦ୍ରତା",
+    wind: "ପବନ",
+    precipitation: "ବୃଷ୍ଟିପାତ",
+    temperature: "ତାପମାତ୍ରା",
+    sun: "ରବି",
+    mon: "ସୋମ",
+    tue: "ମଙ୍ଗଳ",
+    wed: "ବୁଧ",
+    thu: "ଗୁରୁ",
+    fri: "ଶୁକ୍ର",
+    sat: "ଶନି",
+    today: "ଆଜି"
   }
 };

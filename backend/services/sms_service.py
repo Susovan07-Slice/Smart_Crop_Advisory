@@ -31,13 +31,11 @@ def format_phone_e164(phone: str) -> str:
         return f"+91{clean}"
     return f"+{clean}" if not phone.startswith("+") else phone
 
-def send_otp_sms(phone: str, otp: str, role: str = "farmer") -> dict:
+def send_sms(phone: str, message: str, role: str = "farmer") -> dict:
     """
-    Dispatches real-time SMS with OTP via configured SMS Gateway (Fast2SMS or Twilio).
+    Dispatches real-time SMS via configured SMS Gateway (Fast2SMS or Twilio).
     Falls back to safe sandbox logging if credentials are not configured.
     """
-    portal_name = "SmartCrop Officer Portal" if role.lower() == "officer" else "SmartCrop Farmer Assistant"
-    
     # 1. Fast2SMS Provider (Instant Indian SMS Gateway)
     if SMS_PROVIDER == "fast2sms" and FAST2SMS_API_KEY and FAST2SMS_API_KEY != "your_fast2sms_api_key_here":
         target_phone = format_phone_fast2sms(phone)
@@ -52,7 +50,7 @@ def send_otp_sms(phone: str, otp: str, role: str = "farmer") -> dict:
             }
             # Fast2SMS Quick Transactional SMS route (no website verification needed)
             payload = {
-                "message": f"Your {portal_name} verification code is: {otp}. Valid for 5 minutes. Do not share with anyone.",
+                "message": message,
                 "language": "english",
                 "route": "q",
                 "numbers": target_phone
@@ -66,8 +64,8 @@ def send_otp_sms(phone: str, otp: str, role: str = "farmer") -> dict:
                 data = response.json()
                 
                 if response.status_code == 200 and data.get("return") is True:
-                    print(f"✅ [Fast2SMS] Successfully sent OTP {otp} to {target_phone} ({role})")
-                    return {"success": True, "provider": "fast2sms", "message": "OTP delivered via Fast2SMS"}
+                    print(f"✅ [Fast2SMS] Successfully sent SMS to {target_phone} ({role})")
+                    return {"success": True, "provider": "fast2sms", "message": "SMS delivered via Fast2SMS"}
                 else:
                     error_msg = data.get("message", ["Delivery failed"])[0] if isinstance(data.get("message"), list) else data.get("message")
                     print(f"⚠️ [Fast2SMS] API responded with error: {error_msg}")
@@ -83,14 +81,14 @@ def send_otp_sms(phone: str, otp: str, role: str = "farmer") -> dict:
             payload = {
                 "To": target_phone,
                 "From": TWILIO_PHONE_NUMBER,
-                "Body": f"Your {portal_name} verification code is: {otp}. Valid for 5 minutes. Do not share with anyone."
+                "Body": message
             }
             
             with httpx.Client(timeout=10.0) as client:
                 response = client.post(url, auth=auth, data=payload)
                 if response.status_code in [200, 201]:
-                    print(f"✅ [Twilio] Successfully sent OTP {otp} to {target_phone} ({role})")
-                    return {"success": True, "provider": "twilio", "message": "OTP delivered via Twilio"}
+                    print(f"✅ [Twilio] Successfully sent SMS to {target_phone} ({role})")
+                    return {"success": True, "provider": "twilio", "message": "SMS delivered via Twilio"}
                 else:
                     print(f"⚠️ [Twilio] Error: {response.status_code} - {response.text}")
         except Exception as e:
@@ -98,18 +96,24 @@ def send_otp_sms(phone: str, otp: str, role: str = "farmer") -> dict:
 
     # 3. Sandbox / Development Console Fallback
     print("\n" + "="*60)
-    print(f"📱 [SMARTCROP REAL-TIME OTP DISPATCH] -> {phone}")
+    print(f"📱 [SMARTCROP REAL-TIME SMS DISPATCH] -> {phone}")
     print(f"👤 Target Role: {role.upper()}")
-    print(f"🔑 Verification Code: {otp}")
-    print(f"🕒 Validity: 5 Minutes")
+    print(f"✉️  Message: {message}")
     if not FAST2SMS_API_KEY or FAST2SMS_API_KEY == "your_fast2sms_api_key_here":
         print(f"💡 (To send real SMS to mobile, add FAST2SMS_API_KEY in backend/.env)")
     print("="*60 + "\n")
     
-    return {"success": True, "provider": "sandbox", "message": "Sandbox Mode: OTP printed to console.", "otp": otp}
+    return {"success": True, "provider": "sandbox", "message": "Sandbox Mode: SMS printed to console.", "content": message}
 
-    return {
-        "success": True, 
-        "provider": "sandbox", 
-        "message": f"OTP {otp} generated successfully. (Sandbox mode)"
-    }
+
+def send_otp_sms(phone: str, otp: str, role: str = "farmer") -> dict:
+    """
+    Wrapper for send_sms specifically for OTP generation.
+    """
+    portal_name = "SmartCrop Officer Portal" if role.lower() == "officer" else "SmartCrop Farmer Assistant"
+    message = f"Your {portal_name} verification code is: {otp}. Valid for 5 minutes. Do not share with anyone."
+    
+    res = send_sms(phone, message, role)
+    if res.get("provider") == "sandbox":
+        res["otp"] = otp # Keep the OTP accessible for sandbox auth
+    return res
