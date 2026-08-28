@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from schemas.chat import ChatRequest, ChatResponse
-from services import llm_service
+from services import chat_engine
 import uuid
 
 router = APIRouter()
@@ -8,28 +8,43 @@ router = APIRouter()
 @router.post("/chat", response_model=ChatResponse)
 def chat_endpoint(request: ChatRequest):
     """
-    Central orchestrator endpoint.
-    Takes user natural language message, decides what to do, and returns a response.
+    Central Smart Assistant Chat Endpoint.
+    Integrates:
+      1. Local Qwen 14B LLM (Ollama http://localhost:11434)
+      2. Pretrained ML Crop Cascading Pipeline & Financial Distress Score
+      3. Live Weather & District Soil Profiles
+      4. Irrigation Advisory Dataset (Water volume, methods, frequency)
     """
     try:
         session_id = request.session_id or str(uuid.uuid4())
         
-        # Build context from request if provided (e.g. current location, soil data from frontend)
-        context_str = ""
-        if request.context:
-            context_str = "\n".join([f"{k}: {v}" for k, v in request.context.items()])
-            
-        # In a more advanced version, this is where you would call:
-        # 1. Intent Detection
-        # 2. Information Extraction
-        # 3. Call ML/Weather Services based on intent
-        # For now, we pass the user query and context directly to the LLM.
+        district = "Cuttack"
+        season = "Kharif"
+        area_ha = 2.5
+        language = "en"
         
-        reply = llm_service.generate_chat_response(request.message, context_str)
+        if request.context:
+            district = request.context.get("district") or request.context.get("location") or "Cuttack"
+            season = request.context.get("season") or "Kharif"
+            try:
+                area_ha = float(request.context.get("area_ha") or request.context.get("land_area") or 2.5)
+            except ValueError:
+                area_ha = 2.5
+            language = request.context.get("language") or request.context.get("lang") or "en"
+            
+        reply = chat_engine.generate_response(
+            message=request.message,
+            history=None,
+            language=language,
+            district=district,
+            season=season,
+            area_ha=area_ha
+        )
         
         return ChatResponse(
             reply=reply,
             session_id=session_id
         )
     except Exception as e:
+        print(f"Chat endpoint error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

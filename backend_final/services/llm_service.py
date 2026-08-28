@@ -1,47 +1,36 @@
-import openai
-from core.config import settings
+"""
+SmartCrop LLM Service Wrapper
+Delegates directly to chat_engine.generate_response()
+"""
 
-# Initialize OpenAI client to point to local LLM (e.g., Ollama, vLLM, LM Studio)
-client = openai.OpenAI(
-    base_url=settings.LLM_API_BASE,
-    api_key=settings.LLM_API_KEY
-)
+from services import chat_engine
 
-def generate_chat_response(prompt: str, context: str = "") -> str:
+def generate_chat_response(prompt: str, context: str = "", language: str = "en") -> str:
     """
-    Generate a response using the local Qwen model.
+    Generate a response using the local Qwen 14B model + ML Pipeline + Live Weather + Irrigation Dataset.
     """
-    system_prompt = (
-        "You are an AI-powered agriculture assistant for farmers in Odisha called Krushi Shayaka. "
-        "Provide helpful, practical, and location-specific agricultural guidance based on the context provided. "
-        "Keep your answers clear, concise, and easy for a farmer to understand."
-    )
-    
-    messages = [
-        {"role": "system", "content": system_prompt}
-    ]
+    # Extract district, season, area_ha if passed in context string
+    district = "Cuttack"
+    season = "Kharif"
+    area_ha = 2.5
     
     if context:
-        messages.append({"role": "system", "content": f"Relevant Context:\n{context}"})
-        
-    messages.append({"role": "user", "content": prompt})
-    
-    try:
-        response = client.chat.completions.create(
-            model=settings.LLM_MODEL_NAME,
-            messages=messages,
-            temperature=0.3, # Low temperature for more factual responses
-            max_tokens=500
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        print(f"Error calling LLM: {e}")
-        return "Sorry, I am currently unable to process your request. Please ensure the local AI model is running."
+        for line in context.split("\n"):
+            if "district:" in line.lower():
+                district = line.split(":", 1)[1].strip()
+            elif "season:" in line.lower():
+                season = line.split(":", 1)[1].strip()
+            elif "area_ha:" in line.lower() or "land_area:" in line.lower():
+                try:
+                    area_ha = float(line.split(":", 1)[1].strip())
+                except ValueError:
+                    pass
 
-def extract_intent_and_entities(user_message: str):
-    """
-    In a full implementation, you would use function calling or a structured output prompt 
-    to extract intents (e.g., 'CROP_RECOMMENDATION') and entities (e.g., 'Cuttack', 'pH 6.5').
-    For now, this is a placeholder.
-    """
-    pass
+    return chat_engine.generate_response(
+        message=prompt,
+        history=None,
+        language=language,
+        district=district,
+        season=season,
+        area_ha=area_ha
+    )

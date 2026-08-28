@@ -1,335 +1,502 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
-import { Phone, KeyRound, ArrowRight, Loader2, History, X, CheckCircle2, RotateCw, Sprout, Lock } from 'lucide-react';
+import { Phone, ArrowRight, Loader2, History, X, CheckCircle2, Sprout, Lock, User, Calendar, MapPin, Ruler, ShieldCheck, UserPlus, LogIn } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
+const ODISHA_DISTRICTS = [
+  "Angul","Balangir","Balasore","Bargarh","Bhadrak","Boudh","Cuttack","Deogarh", 
+  "Dhenkanal","Gajapati","Ganjam","Jagatsinghpur","Jajpur","Jharsuguda","Kalahandi", 
+  "Kandhamal","Kendrapara","Kendujhar","Khordha","Koraput","Malkangiri","Mayurbhanj", 
+  "Nabarangpur","Nayagarh","Nuapada","Puri","Rayagada","Sambalpur","Subarnapur","Sundargarh"
+];
+
 const Login = () => {
- const [step, setStep] = useState(1);
- const [phone, setPhone] = useState('');
- const [otp, setOtp] = useState('');
- const [loading, setLoading] = useState(false);
- const [resending, setResending] = useState(false);
- const [error, setError] = useState('');
- const [successMsg, setSuccessMsg] = useState('');
- const [testOtp, setTestOtp] = useState('');
- const [cooldown, setCooldown] = useState(0);
+  const [mode, setMode] = useState('login'); // 'login' for returning farmers, 'signup' for new farmers
+  const [phone, setPhone] = useState('');
 
- // Load recent phones from local storage
- const [recentPhones, setRecentPhones] = useState(() => {
- try {
- const stored = JSON.parse(localStorage.getItem('recentFarmerPhones'));
- if (stored && stored.length > 0) return stored;
- } catch (e) {
- console.error(e);
- }
- return ['9437123456', '9876543210'];
- });
- const [showRecent, setShowRecent] = useState(false);
- 
- const navigate = useNavigate();
- const { t } = useLanguage();
+  // Sign Up Profile Fields
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [district, setDistrict] = useState('Cuttack');
+  const [dob, setDob] = useState('1990-01-01');
+  const [landAreaHa, setLandAreaHa] = useState(2.5);
 
- // Handle countdown timer for Resend OTP
- useEffect(() => {
- let timer;
- if (cooldown > 0) {
- timer = setInterval(() => {
- setCooldown((prev) => prev - 1);
- }, 1000);
- }
- return () => clearInterval(timer);
- }, [cooldown]);
+  // 4-Digit PIN Fields
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
 
- const handleRequestOtp = async (e) => {
- e?.preventDefault();
- setError('');
- setSuccessMsg('');
- 
- if (phone.length < 10) {
- setError('Please enter a valid 10-digit phone number.');
- return;
- }
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
- setLoading(true);
- try {
- const response = await apiClient.post('/auth/request-otp', { 
- phone,
- role: 'farmer'
- });
- setStep(2);
- setSuccessMsg(response.data.message || t('otp_sent_success'));
- setCooldown(response.data.resend_cooldown || 30);
- if (response.data.test_otp) setTestOtp(response.data.test_otp);
- } catch (err) {
- setError(err.response?.data?.detail || 'Failed to send OTP. Please try again.');
- } finally {
- setLoading(false);
- }
- };
+  // Recent phones history
+  const [recentPhones, setRecentPhones] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('recentFarmerPhones'));
+      if (stored && stored.length > 0) return stored;
+    } catch (e) {
+      console.error(e);
+    }
+    return ['9876543210', '9437123456'];
+  });
+  const [showRecent, setShowRecent] = useState(false);
 
- const handleResendOtp = async () => {
- if (cooldown > 0 || resending) return;
- setError('');
- setSuccessMsg('');
- setResending(true);
+  const navigate = useNavigate();
+  const { t } = useLanguage();
 
- try {
- const response = await apiClient.post('/auth/request-otp', { 
- phone,
- role: 'farmer'
- });
- setSuccessMsg(response.data.message || t('otp_sent_success'));
- setCooldown(response.data.resend_cooldown || 30);
- if (response.data.test_otp) setTestOtp(response.data.test_otp);
- } catch (err) {
- setError(err.response?.data?.detail || 'Failed to resend OTP. Please try again.');
- } finally {
- setResending(false);
- }
- };
+  // Handle Returning Farmer Login (Mobile + 4-Digit PIN)
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
 
- const handleVerifyOtp = async (e) => {
- e.preventDefault();
- setError('');
- 
- if (otp.length < 4) {
- setError('Please enter the full OTP code.');
- return;
- }
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      setError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
 
- setLoading(true);
- try {
- const response = await apiClient.post('/auth/verify-otp', { 
- phone, 
- otp,
- role: 'farmer'
- });
- if (response.data.token) {
- // Save token
- localStorage.setItem('token', response.data.token);
- 
- // Save to recent logins (unique, max 3)
- const newRecents = [...new Set([phone, ...recentPhones])].slice(0, 3);
- localStorage.setItem('recentFarmerPhones', JSON.stringify(newRecents));
- setRecentPhones(newRecents);
+    if (pin.length !== 4) {
+      setError(t('pin_length_err'));
+      return;
+    }
 
- navigate('/farmer-dashboard');
- }
- } catch (err) {
- setError(err.response?.data?.detail || 'Invalid OTP code. Please check and try again.');
- } finally {
- setLoading(false);
- }
- };
+    setLoading(true);
+    try {
+      const response = await apiClient.post('/auth/login-pin', {
+        phone: cleanPhone,
+        pin: pin,
+        role: 'farmer'
+      });
 
- return (
- <div 
- className="min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100vh-4rem)] flex items-center justify-center py-6 sm:py-12 px-3 sm:px-6 lg:px-8 relative overflow-hidden"
- style={{
- backgroundImage:"url('/bg-greenery.jpg')",
- backgroundSize: 'cover',
- backgroundPosition: 'center',
- backgroundRepeat: 'no-repeat'
- }}
- >
- <div className="absolute inset-0 bg-white/40 backdrop-blur-xs"></div>
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('farmerMobile', cleanPhone);
+        localStorage.setItem('promptLoanOnLogin', 'true');
 
- <div className="relative z-10 max-w-sm sm:max-w-md w-full space-y-6 sm:space-y-8 bg-white/95 backdrop-blur-sm p-5 sm:p-8 rounded-2xl shadow-xl border border-green-100">
- 
- <div className="text-center">
- <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
- <Sprout className="h-10 w-10 text-green-600" />
- </div>
- <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
- {t('farmer_login_title')}
- </h2>
- <p className="mt-2 text-xs sm:text-sm text-gray-600">
- {step === 1 ? t('enter_mobile') : `${t('enter_code')} ${phone}`}
- </p>
- </div>
+        if (response.data.profile) {
+          localStorage.setItem('smartCropFarmerProfile', JSON.stringify(response.data.profile));
+          if (response.data.profile.district) {
+            localStorage.setItem('smartCropLocation', response.data.profile.district);
+          }
+          if (response.data.profile.land_area_ha) {
+            localStorage.setItem('smartCropLandArea', response.data.profile.land_area_ha);
+          }
+        }
 
- {error && (
- <div className="bg-red-50 border border-red-200 text-red-600 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm">
- {error}
- </div>
- )}
+        const newRecents = [...new Set([cleanPhone, ...recentPhones])].slice(0, 3);
+        localStorage.setItem('recentFarmerPhones', JSON.stringify(newRecents));
 
- {successMsg && step === 2 && (
- <div className="bg-green-50 border border-green-200 text-green-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm flex flex-col gap-1">
- <div className="flex items-center">
- <CheckCircle2 className="h-4 w-4 mr-2 flex-shrink-0 text-green-600" />
- <span>{successMsg}</span>
- </div>
- {testOtp && (
- <div className="mt-2 bg-green-100 p-2 rounded-lg border border-green-300 font-mono text-center text-lg font-bold text-green-900 tracking-widest shadow-sm">
- {testOtp}
- </div>
- )}
- </div>
- )}
+        navigate('/farmer-dashboard');
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Incorrect mobile number or 4-digit PIN. If you don\'t have an account, click Sign Up below.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
- {step === 1 ? (
- <form className="mt-6 sm:mt-8 space-y-4 sm:space-y-6" onSubmit={handleRequestOtp}>
- <div className="relative rounded-xl shadow-xs">
- <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
- <Phone className="h-5 w-5 text-gray-400" />
- </div>
- <input
- id="phone"
- name="phone"
- type="tel"
- required
- autoComplete="off"
- className="focus:ring-green-500 focus:border-green-500 block w-full pl-10 text-base sm:text-lg border-gray-300 rounded-xl py-3 sm:py-3.5 bg-gray-50 border font-mono tracking-wider"
- placeholder={t('mobile_placeholder')}
- value={phone}
- onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
- onFocus={() => setShowRecent(true)}
- onBlur={() => setShowRecent(false)}
- maxLength={10}
- />
- 
- {/* Recent Logins Dropdown */}
- {showRecent && recentPhones.filter(p => p.includes(phone)).length > 0 && (
- <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
- <div className="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-500 flex items-center border-b border-gray-100">
- <History className="w-3.5 h-3.5 mr-1.5" /> {t('recent_logins')}
- </div>
- {recentPhones.filter(p => p.includes(phone)).map((p) => {
- const matchIndex = p.indexOf(phone);
- const beforeMatch = p.slice(0, matchIndex);
- const matchText = p.slice(matchIndex, matchIndex + phone.length);
- const afterMatch = p.slice(matchIndex + phone.length);
+  // Handle New Farmer Sign Up (All Profile Details + 4-Digit PIN)
+  const handleSignUpSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
 
- return (
- <div
- key={p}
- onMouseDown={(e) => {
- e.preventDefault(); 
- setPhone(p);
- setShowRecent(false);
- }}
- className="px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-green-50 active:bg-green-100 cursor-pointer text-gray-700 flex items-center justify-between border-b border-gray-50 last:border-0 group"
- >
- <div className="flex items-center min-w-0 pr-2">
- <Phone className="w-4 h-4 mr-2.5 text-gray-400 flex-shrink-0" />
- <span className="font-medium tracking-wide text-sm sm:text-base truncate">
- {phone.length > 0 && matchIndex >= 0 ? (
- <>
- {beforeMatch}
- <span className="text-green-600 font-bold">{matchText}</span>
- {afterMatch}
- </>
- ) : (
- p
- )}
- </span>
- </div>
- 
- <button
- onMouseDown={(e) => {
- e.preventDefault();
- e.stopPropagation();
- const updated = recentPhones.filter(item => item !== p);
- setRecentPhones(updated);
- localStorage.setItem('recentFarmerPhones', JSON.stringify(updated));
- }}
- className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 transition-colors opacity-80 sm:opacity-0 sm:group-hover:opacity-100 flex-shrink-0"
- title="Remove from history"
- >
- <X className="w-4 h-4" />
- </button>
- </div>
- );
- })}
- </div>
- )}
- </div>
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      setError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
 
- <button
- type="submit"
- disabled={loading || phone.length < 10}
- className="group relative w-full flex justify-center items-center py-3 sm:py-3.5 px-4 border border-transparent text-base sm:text-lg font-medium rounded-xl text-white bg-green-600 hover:bg-green-700 active:scale-[0.99] focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
- >
- {loading ? <Loader2 className="animate-spin h-5 w-5 sm:h-6 sm:w-6" /> : t('get_otp')}
- </button>
- </form>
- ) : (
- <form className="mt-6 sm:mt-8 space-y-4 sm:space-y-6" onSubmit={handleVerifyOtp}>
- <div className="relative rounded-xl shadow-xs">
- <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
- <Lock className="h-5 w-5 text-gray-400" />
- </div>
- <input
- id="otp"
- name="otp"
- type="text"
- required
- autoFocus
- className="focus:ring-green-500 focus:border-green-500 block w-full pl-10 text-base sm:text-lg border-gray-300 rounded-xl py-3 sm:py-3.5 bg-gray-50 border text-center tracking-widest font-bold font-mono"
- placeholder="••••••"
- value={otp}
- onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
- maxLength={6}
- />
- </div>
+    if (!firstName.trim() || !lastName.trim()) {
+      setError('Please enter your First Name and Surname (Last Name).');
+      return;
+    }
 
- <button
- type="submit"
- disabled={loading || otp.length < 4}
- className="group relative w-full flex justify-center items-center py-3 sm:py-3.5 px-4 border border-transparent text-base sm:text-lg font-medium rounded-xl text-white bg-green-600 hover:bg-green-700 active:scale-[0.99] focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
- >
- {loading ? (
- <Loader2 className="animate-spin h-5 w-5 sm:h-6 sm:w-6" />
- ) : (
- <span className="flex items-center justify-center">
- {t('verify_login')} <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
- </span>
- )}
- </button>
- 
- {/* Resend & Change Mobile Actions */}
- <div className="flex items-center justify-between text-xs sm:text-sm pt-2 border-t border-gray-100">
- <button 
- type="button" 
- onClick={() => {
- setStep(1);
- setOtp('');
- setError('');
- setSuccessMsg('');
- }} 
- className="text-gray-500 hover:text-gray-700 font-medium"
- >
- ← {t('change_mobile')}
- </button>
+    if (pin.length !== 4) {
+      setError(t('pin_length_err'));
+      return;
+    }
 
- <button
- type="button"
- onClick={handleResendOtp}
- disabled={cooldown > 0 || resending}
- className="text-green-700 hover:text-green-800 font-semibold disabled:text-gray-400 disabled:cursor-not-allowed flex items-center"
- >
- {resending ? (
- <span className="flex items-center">
- <Loader2 className="animate-spin h-3.5 w-3.5 mr-1" />
- Sending...
- </span>
- ) : cooldown > 0 ? (
- <span>{t('resend_in')} {cooldown}{t('seconds_abbr')}</span>
- ) : (
- <span className="flex items-center">
- <RotateCw className="h-3.5 w-3.5 mr-1" />
- {t('resend_otp')}
- </span>
- )}
- </button>
- </div>
- </form>
- )}
- </div>
- </div>
- );
+    if (pin !== confirmPin) {
+      setError(t('pin_mismatch'));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await apiClient.post('/auth/register-pin', {
+        phone: cleanPhone,
+        pin: pin,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        district: district,
+        dob: dob,
+        land_area_ha: parseFloat(landAreaHa) || 2.5,
+        role: 'farmer'
+      });
+
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('farmerMobile', cleanPhone);
+        localStorage.setItem('promptLoanOnLogin', 'true');
+        
+        if (response.data.profile) {
+          localStorage.setItem('smartCropFarmerProfile', JSON.stringify(response.data.profile));
+          localStorage.setItem('smartCropLocation', response.data.profile.district || district);
+          localStorage.setItem('smartCropLandArea', response.data.profile.land_area_ha || landAreaHa);
+        } else {
+          localStorage.setItem('smartCropLocation', district);
+          localStorage.setItem('smartCropLandArea', landAreaHa);
+        }
+
+        const newRecents = [...new Set([cleanPhone, ...recentPhones])].slice(0, 3);
+        localStorage.setItem('recentFarmerPhones', JSON.stringify(newRecents));
+
+        navigate('/farmer-dashboard');
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to register farmer account. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div 
+      className="min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100vh-4rem)] flex items-center justify-center py-6 sm:py-10 px-3 sm:px-6 lg:px-8 relative overflow-hidden"
+      style={{
+        backgroundImage: "url('/bg-greenery.jpg')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      <div className="absolute inset-0 bg-white/40 backdrop-blur-xs"></div>
+
+      <div className="relative z-10 max-w-md w-full space-y-4 bg-white/95 backdrop-blur-sm p-5 sm:p-7 rounded-3xl shadow-xl border border-green-100 max-h-[92vh] overflow-y-auto">
+        
+        <div className="text-center">
+          <div className="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-green-100 mb-2 shadow-xs">
+            <Sprout className="h-9 w-9 text-green-600" />
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+            {mode === 'login' ? t('farmer_login_title') : t('farmer_signup_title')}
+          </h2>
+          <p className="mt-1 text-xs sm:text-sm text-gray-600 font-medium">
+            {mode === 'login' ? t('returning_farmer_login') : t('new_farmer_signup')}
+          </p>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold animate-in fade-in">
+            ⚠️ {error}
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3.5 py-2 rounded-xl text-xs sm:text-sm flex items-center gap-2 font-medium">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
+        {/* MODE 1: FARMER LOGIN (Mobile Number + 4-Digit PIN) */}
+        {mode === 'login' ? (
+          <form className="space-y-4" onSubmit={handleLoginSubmit}>
+            
+            {/* Mobile Number Input */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                Mobile Number
+              </label>
+              <div className="relative rounded-xl shadow-xs">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Phone className="h-5 w-5 text-emerald-600" />
+                </div>
+                <input
+                  id="login-phone"
+                  type="tel"
+                  required
+                  autoComplete="off"
+                  className="focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full pl-11 text-base sm:text-lg border-gray-300 rounded-xl py-2.5 bg-gray-50 border font-mono text-gray-900"
+                  placeholder={t('mobile_placeholder')}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                  onFocus={() => setShowRecent(true)}
+                  onBlur={() => setTimeout(() => setShowRecent(false), 200)}
+                  maxLength={10}
+                />
+
+                {/* Recent Logins History Dropdown */}
+                {showRecent && recentPhones.filter(p => p.includes(phone)).length > 0 && (
+                  <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                    <div className="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-500 flex items-center border-b border-gray-100">
+                      <History className="w-3.5 h-3.5 mr-1.5 text-gray-400" /> {t('recent_logins')}
+                    </div>
+                    {recentPhones.filter(p => p.includes(phone)).map((p) => (
+                      <div
+                        key={p}
+                        onMouseDown={(e) => {
+                          e.preventDefault(); 
+                          setPhone(p);
+                          setShowRecent(false);
+                        }}
+                        className="px-3 sm:px-4 py-2.5 hover:bg-green-50 active:bg-green-100 cursor-pointer text-gray-700 flex items-center justify-between border-b border-gray-50 last:border-0 group"
+                      >
+                        <div className="flex items-center min-w-0 pr-2">
+                          <Phone className="w-4 h-4 mr-2.5 text-gray-400 flex-shrink-0" />
+                          <span className="font-medium tracking-wide text-sm font-mono">{p}</span>
+                        </div>
+                        
+                        <button
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const updated = recentPhones.filter(item => item !== p);
+                            setRecentPhones(updated);
+                            localStorage.setItem('recentFarmerPhones', JSON.stringify(updated));
+                          }}
+                          className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 transition-colors opacity-80 sm:opacity-0 sm:group-hover:opacity-100 flex-shrink-0"
+                          title="Remove from history"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 4-Digit Security PIN Input */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                {t('enter_pin')}
+              </label>
+              <div className="relative rounded-xl shadow-xs">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-emerald-600" />
+                </div>
+                <input
+                  id="login-pin"
+                  type="password"
+                  required
+                  className="focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full pl-11 text-xl border-gray-300 rounded-xl py-2.5 bg-gray-50 border text-center tracking-[0.5em] font-bold font-mono text-gray-900"
+                  placeholder="••••"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                  maxLength={4}
+                />
+              </div>
+            </div>
+
+            {/* Submit Login Button */}
+            <button
+              type="submit"
+              disabled={loading || phone.replace(/\D/g, '').length < 10 || pin.length < 4}
+              className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-base font-bold rounded-xl text-white bg-green-600 hover:bg-green-700 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md mt-2"
+            >
+              {loading ? (
+                <Loader2 className="animate-spin h-5 w-5" />
+              ) : (
+                <span className="flex items-center justify-center">
+                  <LogIn className="mr-2 h-4 w-4" /> {t('login_btn')} <ArrowRight className="ml-2 h-4 w-4" />
+                </span>
+              )}
+            </button>
+
+            {/* Prominent Link Below Login: Don't have an account? Sign Up */}
+            <div className="text-center pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('signup');
+                  setError('');
+                  setSuccessMsg('');
+                }}
+                className="text-xs sm:text-sm font-extrabold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center justify-center mx-auto space-x-1.5 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-200 shadow-2xs transition-colors"
+              >
+                <UserPlus className="h-4 w-4 text-emerald-700" />
+                <span>{t('dont_have_account')}</span>
+              </button>
+            </div>
+          </form>
+        ) : (
+          /* MODE 2: NEW FARMER SIGN UP (All Profile Details + 4-Digit PIN) */
+          <form className="space-y-3.5" onSubmit={handleSignUpSubmit}>
+            
+            {/* First Name & Last Name */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1 flex items-center">
+                  <User className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                  {t('first_name_label')}
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none"
+                  placeholder={t('first_name_placeholder')}
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1 flex items-center">
+                  <User className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                  {t('last_name_label')}
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none"
+                  placeholder={t('last_name_placeholder')}
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Mobile Number Input */}
+            <div>
+              <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1 flex items-center">
+                <Phone className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                Mobile Number
+              </label>
+              <input
+                type="tel"
+                required
+                className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none"
+                placeholder={t('mobile_placeholder')}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                maxLength={10}
+              />
+            </div>
+
+            {/* District & DOB */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1 flex items-center">
+                  <MapPin className="h-3.5 w-3.5 mr-1 text-red-500" />
+                  {t('district_label')}
+                </label>
+                <select
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded-xl px-2.5 py-2 text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none"
+                >
+                  {ODISHA_DISTRICTS.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1 flex items-center">
+                  <Calendar className="h-3.5 w-3.5 mr-1 text-blue-500" />
+                  {t('dob_label')}
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded-xl px-2 py-1.5 text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Land Area Input */}
+            <div>
+              <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1 flex items-center">
+                <Ruler className="h-3.5 w-3.5 mr-1 text-amber-600" />
+                {t('land_area_label')}
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                required
+                value={landAreaHa}
+                onChange={(e) => setLandAreaHa(e.target.value)}
+                className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none"
+                placeholder="e.g. 2.5"
+              />
+            </div>
+
+            {/* Set 4-Digit Security PIN */}
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                  {t('setup_pin')}
+                </label>
+                <input
+                  type="password"
+                  required
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl py-2 text-center text-lg font-bold font-mono tracking-widest text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
+                  placeholder="••••"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                  maxLength={4}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
+                  {t('confirm_pin')}
+                </label>
+                <input
+                  type="password"
+                  required
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl py-2 text-center text-lg font-bold font-mono tracking-widest text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
+                  placeholder="••••"
+                  value={confirmPin}
+                  onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+                  maxLength={4}
+                />
+              </div>
+            </div>
+
+            {/* Submit Sign Up Button */}
+            <button
+              type="submit"
+              disabled={loading || phone.replace(/\D/g, '').length < 10 || pin.length < 4 || confirmPin.length < 4 || !firstName.trim() || !lastName.trim()}
+              className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-base font-bold rounded-xl text-white bg-green-600 hover:bg-green-700 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md mt-2"
+            >
+              {loading ? (
+                <Loader2 className="animate-spin h-5 w-5" />
+              ) : (
+                <span className="flex items-center justify-center">
+                  <UserPlus className="mr-2 h-4 w-4" /> {t('signup_btn')} <ArrowRight className="ml-2 h-4 w-4" />
+                </span>
+              )}
+            </button>
+
+            {/* Prominent Link Below Sign Up: Already have an account? Login */}
+            <div className="text-center pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login');
+                  setError('');
+                  setSuccessMsg('');
+                }}
+                className="text-xs sm:text-sm font-extrabold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center justify-center mx-auto space-x-1.5 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-200 shadow-2xs transition-colors"
+              >
+                <LogIn className="h-4 w-4 text-emerald-700" />
+                <span>{t('already_have_account')}</span>
+              </button>
+            </div>
+          </form>
+        )}
+
+      </div>
+    </div>
+  );
 };
 
 export default Login;

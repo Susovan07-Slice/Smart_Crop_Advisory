@@ -1,295 +1,530 @@
 import React, { useState, useEffect, useRef } from 'react';
 import apiClient from '../api/client';
-import { Mic, MicOff, Send, Bot, User, Loader2, Volume2, Sprout, MoreVertical } from 'lucide-react';
+import { 
+  Mic, MicOff, Send, Bot, User, Loader2, Volume2, Sprout, 
+  Plus, MessageSquare, Trash2, Clock, PanelLeftClose, PanelLeftOpen, Sparkles 
+} from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
+const DEFAULT_GREETING = {
+  role: 'assistant',
+  isGreeting: true,
+  text: 'Namaste! 🙏 Welcome to **Krushi Sahayak (କୃଷି ସହାୟକ)**, your official agricultural advisor.\n\n🌾 **Topics You Can Ask Me About**:\n• 💰 **Highest Net Profit Analysis**: *"Which crop gives the highest profit in my district?"*\n• 💧 **Irrigation Advisory & Water Demand**: *"What is the irrigation advice for Groundnut in Ganjam?"*\n• 📈 **Mandi Prices & Market Rates**: *"What are the current mandi prices for Rice and Ragi?"*\n• 🏛️ **Government Farmer Schemes**: *"What benefits can I get under KALIA and PM-KISAN?"*\n• 🧪 **Soil & Fertilizer Guidance**: *"What is the NPK fertilizer ratio and liming recommendation?"*\n• 🛡️ **Pest & Disease Control**: *"How to treat yellow leaf spots in pulses organically?"*\n\nHow can I assist your farm today?'
+};
+
 const FarmerChat = ({ isEmbedded = false }) => {
- const { t, lang } = useLanguage();
- const [messages, setMessages] = useState([
- { role: 'assistant', isGreeting: true, text: 'Namaste! I am your SmartCrop Assistant. How can I help you today? You can press the microphone button to talk to me.' }
- ]);
- const [inputText, setInputText] = useState('');
- const [isListening, setIsListening] = useState(false);
- const [loading, setLoading] = useState(false);
- const [playingId, setPlayingId] = useState(null);
- 
- const messagesEndRef = useRef(null);
- const recognitionRef = useRef(null);
+  const { t, lang } = useLanguage();
+  
+  // LocalStorage Key for Chat Sessions
+  const STORAGE_KEY = 'smartCrop_chat_sessions_v1';
+  const ACTIVE_KEY = 'smartCrop_active_session_id';
 
- // Setup Web Speech API for Text-to-Speech (Cleanup)
- useEffect(() => {
- return () => {
- if (window.speechSynthesis) {
- window.speechSynthesis.cancel();
- }
- };
- }, []);
+  const [sessions, setSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [messages, setMessages] = useState([DEFAULT_GREETING]);
+  const [inputText, setInputText] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [playingId, setPlayingId] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
- const handleReadAloud = (text, idx) => {
- if (!('speechSynthesis' in window)) {
- alert("Sorry, your browser doesn't support text to speech!");
- return;
- }
+  const messagesEndRef = useRef(null);
+  const recognitionRef = useRef(null);
 
- // If currently speaking, stop it.
- if (window.speechSynthesis.speaking) {
- window.speechSynthesis.cancel();
- // If clicking the same message, just stop it and exit
- if (playingId === idx) {
- setPlayingId(null);
- return;
- }
- }
- 
- const utterance = new SpeechSynthesisUtterance(text);
- 
- // Safely attempt to find an Indian accent voice without causing a silent crash
- const voices = window.speechSynthesis.getVoices();
- // Determine correct voice language code
- let voiceLangCode = 'en-IN';
- if (lang === 'hi') voiceLangCode = 'hi-IN';
- if (lang === 'or') voiceLangCode = 'or-IN';
- 
- // Look for appropriate voice matching the selected language
- const indianVoice = voices.find(v => 
- v.lang.includes(voiceLangCode) || 
- (lang === 'hi' && v.name.toLowerCase().includes('hindi')) ||
- (lang === 'en' && v.name.includes('India')) ||
- (lang === 'en' && v.lang.includes('-IN'))
- );
- 
- if (indianVoice) {
- utterance.voice = indianVoice;
- }
+  // Format Date & Time for Chat History Items
+  const formatDateTime = (timestamp = Date.now()) => {
+    const d = new Date(timestamp);
+    const day = d.getDate();
+    const month = d.toLocaleString('en-US', { month: 'short' });
+    const time = d.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${day} ${month}, ${time}`;
+  };
 
- // Fix for a known Chrome bug where speech stops halfway because it gets garbage collected
- window.utteranceStore = window.utteranceStore || [];
- window.utteranceStore.push(utterance);
- 
- utterance.onstart = () => setPlayingId(idx);
- utterance.onend = () => {
- setPlayingId(null);
- window.utteranceStore = window.utteranceStore.filter(u => u !== utterance);
- };
- utterance.onerror = (e) => {
- console.error("Speech error:", e);
- setPlayingId(null);
- };
- 
- window.speechSynthesis.speak(utterance);
- };
+  // Initialize Chat Sessions from LocalStorage
+  useEffect(() => {
+    const savedSessions = localStorage.getItem(STORAGE_KEY);
+    let parsedSessions = [];
 
- // Setup Web Speech API for Speech-to-Text
- useEffect(() => {
- const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
- if (SpeechRecognition) {
- const recognition = new SpeechRecognition();
- recognition.continuous = false;
- recognition.interimResults = true;
+    if (savedSessions) {
+      try {
+        parsedSessions = JSON.parse(savedSessions);
+      } catch (err) {
+        console.error("Error loading chat history:", err);
+      }
+    }
 
- recognition.onresult = (event) => {
- let currentTranscript = '';
- for (let i = event.resultIndex; i < event.results.length; i++) {
- currentTranscript += event.results[i][0].transcript;
- }
- setInputText(currentTranscript);
- };
+    if (parsedSessions.length === 0) {
+      const initSession = {
+        id: 'sess_' + Date.now(),
+        title: 'New Advisory Session',
+        dateStr: formatDateTime(),
+        timestamp: Date.now(),
+        messages: [DEFAULT_GREETING]
+      };
+      parsedSessions = [initSession];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsedSessions));
+      localStorage.setItem(ACTIVE_KEY, initSession.id);
+    }
 
- recognition.onend = () => {
- setIsListening(false);
- };
+    const savedActiveId = localStorage.getItem(ACTIVE_KEY) || parsedSessions[0].id;
+    const activeSess = parsedSessions.find(s => s.id === savedActiveId) || parsedSessions[0];
 
- recognition.onerror = (event) => {
- console.error("Speech recognition error", event.error);
- setIsListening(false);
- };
+    setSessions(parsedSessions);
+    setCurrentSessionId(activeSess.id);
+    setMessages(activeSess.messages || [DEFAULT_GREETING]);
+  }, []);
 
- recognitionRef.current = recognition;
- }
- }, []);
+  // Sync Messages to LocalStorage whenever messages or session changes
+  const saveCurrentSessionMessages = (updatedMessages, updatedTitle = null) => {
+    if (!currentSessionId) return;
 
- const toggleListen = () => {
- if (isListening) {
- recognitionRef.current?.stop();
- setIsListening(false);
- } else {
- if (!recognitionRef.current) {
- alert("Your browser does not support voice typing. Please use Chrome or Edge.");
- return;
- }
- setInputText(''); // Clear input before listening
- 
- // Update voice recognition language right before starting
- let recLang = 'en-IN';
- if (lang === 'hi') recLang = 'hi-IN';
- if (lang === 'or') recLang = 'or-IN';
- recognitionRef.current.lang = recLang;
- 
- recognitionRef.current.start();
- setIsListening(true);
- }
- };
+    setSessions(prevSessions => {
+      const newSessions = prevSessions.map(sess => {
+        if (sess.id === currentSessionId) {
+          const firstUserMsg = updatedMessages.find(m => m.role === 'user');
+          let newTitle = sess.title;
+          if (updatedTitle) {
+            newTitle = updatedTitle;
+          } else if (firstUserMsg && sess.title === 'New Advisory Session') {
+            newTitle = firstUserMsg.text.slice(0, 28) + (firstUserMsg.text.length > 28 ? '...' : '');
+          }
 
- const scrollToBottom = () => {
- messagesEndRef.current?.scrollIntoView({ behavior:"smooth" });
- };
+          return {
+            ...sess,
+            title: newTitle,
+            messages: updatedMessages,
+            timestamp: Date.now()
+          };
+        }
+        return sess;
+      });
 
- useEffect(() => {
- scrollToBottom();
- }, [messages, loading]);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newSessions));
+      return newSessions;
+    });
+  };
 
- const handleSendMessage = async (e) => {
- e?.preventDefault();
- if (!inputText.trim()) return;
+  // Start a Brand New Chat Session
+  const createNewChat = () => {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    setPlayingId(null);
 
- if (isListening) {
- recognitionRef.current?.stop();
- setIsListening(false);
- }
+    const newId = 'sess_' + Date.now();
+    const newSession = {
+      id: newId,
+      title: 'New Advisory Session',
+      dateStr: formatDateTime(),
+      timestamp: Date.now(),
+      messages: [DEFAULT_GREETING]
+    };
 
- // Stop any ongoing speech if user sends a new message
- if (window.speechSynthesis.speaking) {
- window.speechSynthesis.cancel();
- setPlayingId(null);
- }
+    const updatedSessions = [newSession, ...sessions];
+    setSessions(updatedSessions);
+    setCurrentSessionId(newId);
+    setMessages([DEFAULT_GREETING]);
 
- const userMessage = inputText.trim();
- setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
- setInputText('');
- setLoading(true);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSessions));
+    localStorage.setItem(ACTIVE_KEY, newId);
+  };
 
- try {
- const response = await apiClient.post('/chat', { 
- message: userMessage,
- language: lang,
- history: [...messages, { role: 'user', text: userMessage }]
- .filter(m => !m.isGreeting)
- .slice(-10)
- .map(m => ({ role: m.role, text: m.text }))
- });
- const newMsg = { role: 'assistant', text: response.data.reply };
- setMessages(prev => [...prev, newMsg]);
- 
- // Optional: Auto-read the response when it arrives
- // setTimeout(() => handleReadAloud(response.data.reply, messages.length + 1), 100);
- 
- } catch (error) {
- setMessages(prev => [...prev, { role: 'assistant', text:"Sorry, I'm having trouble connecting right now. Please try again." }]);
- } finally {
- setLoading(false);
- }
- };
+  // Switch Active Session
+  const selectSession = (id) => {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    setPlayingId(null);
 
- return (
- <div className={`flex flex-col bg-gray-50 font-sans transition-colors ${isEmbedded ? 'w-full h-full' : 'max-w-3xl mx-auto h-[calc(100dvh-3.5rem)] sm:h-[calc(100vh-4rem)]'}`}>
- <header className="bg-white shadow-xs px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between z-10 shrink-0 border-b border-gray-200 transition-colors">
- <div className="flex items-center space-x-3">
- <div className="bg-green-100 p-2 rounded-full hidden sm:block">
- <Sprout className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
- </div>
- <div>
- <h1 className="text-lg sm:text-xl font-bold text-gray-800 leading-tight">
- {t('chat_title')}
- </h1>
- <p className="text-xs text-green-600 font-medium">
- {t('chat_subtitle')}
- </p>
- </div>
- </div>
- <button className="text-gray-400 hover:text-gray-600 p-1 sm:p-2">
- <MoreVertical className="h-5 w-5" />
- </button>
- </header>
+    const target = sessions.find(s => s.id === id);
+    if (target) {
+      setCurrentSessionId(id);
+      setMessages(target.messages || [DEFAULT_GREETING]);
+      localStorage.setItem(ACTIVE_KEY, id);
+    }
+  };
 
- <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
- {messages.map((msg, idx) => (
- <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
- <div className={`flex max-w-[90%] sm:max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
- <div className={`flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 rounded-full flex items-center justify-center ${msg.role === 'user' ? 'bg-green-100 ml-2 sm:ml-3' : 'bg-blue-100 mr-2 sm:mr-3'}`}>
- {msg.role === 'user' ? <User className="h-4 w-4 sm:h-5 sm:w-5 text-green-700" /> : <Bot className="h-4 w-4 sm:h-5 sm:w-5 text-blue-700" />}
- </div>
- <div className={`p-3 sm:p-4 rounded-2xl shadow-xs ${msg.role === 'user' ? 'bg-green-600 text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none border border-gray-100 '}`}>
- <p className="text-sm sm:text-base md:text-lg leading-relaxed whitespace-pre-wrap">{msg.isGreeting ? t('chat_greeting') : msg.text}</p>
- 
- {msg.role === 'assistant' && (
- <div className="mt-2.5 sm:mt-3 flex justify-end">
- <button
- onClick={() => handleReadAloud(msg.isGreeting ? t('chat_greeting') : msg.text, idx)}
- className={`flex items-center text-xs sm:text-sm font-medium transition-colors px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg border active:scale-95 ${
- playingId === idx 
- ? 'text-green-700 bg-green-50 border-green-200 shadow-inner' 
- : 'text-gray-500 hover:text-green-600 hover:bg-green-50 border-transparent'
- }`}
- title={t('read_aloud')}
- >
- <Volume2 className={`h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 ${playingId === idx ? 'animate-pulse text-green-600' : ''}`} />
- <span>{playingId === idx ? t('stop_reading') : t('read_aloud')}</span>
- </button>
- </div>
- )}
- </div>
- </div>
- </div>
- ))}
- {loading && (
- <div className="flex justify-start">
- <div className="flex bg-white p-3 sm:p-4 rounded-2xl rounded-tl-none border border-gray-100 shadow-xs ml-10 sm:ml-13 items-center">
- <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 animate-spin mr-2" />
- <span className="text-gray-500 text-xs sm:text-sm">{t('thinking')}</span>
- </div>
- </div>
- )}
- <div ref={messagesEndRef} />
- </div>
+  // Delete a Chat Session
+  const deleteSession = (id, e) => {
+    e.stopPropagation();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    setPlayingId(null);
 
- <div className="bg-white border-t border-gray-200 p-3 sm:p-4 shrink-0 transition-colors">
- <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-end space-x-2 sm:space-x-3">
- <button
- type="button"
- onClick={toggleListen}
- className={`p-3 sm:p-3.5 rounded-full flex-shrink-0 transition-all shadow-xs ${
- isListening 
- ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse shadow-red-200 ' 
- : 'bg-green-100 text-green-600 hover:bg-green-200 '
- }`}
- title={isListening ?"Stop listening" :"Tap to speak"}
- >
- {isListening ? <MicOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <Mic className="h-5 w-5 sm:h-6 sm:w-6" />}
- </button>
+    const updated = sessions.filter(s => s.id !== id);
+    
+    if (updated.length === 0) {
+      const newSession = {
+        id: 'sess_' + Date.now(),
+        title: 'New Advisory Session',
+        dateStr: formatDateTime(),
+        timestamp: Date.now(),
+        messages: [DEFAULT_GREETING]
+      };
+      setSessions([newSession]);
+      setCurrentSessionId(newSession.id);
+      setMessages([DEFAULT_GREETING]);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([newSession]));
+      localStorage.setItem(ACTIVE_KEY, newSession.id);
+    } else {
+      setSessions(updated);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      if (currentSessionId === id) {
+        setCurrentSessionId(updated[0].id);
+        setMessages(updated[0].messages || [DEFAULT_GREETING]);
+        localStorage.setItem(ACTIVE_KEY, updated[0].id);
+      }
+    }
+  };
 
- <div className="flex-1 relative">
- <textarea
- value={inputText}
- onChange={(e) => setInputText(e.target.value)}
- placeholder={t('chat_placeholder')}
- rows={1}
- className="w-full bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-500 rounded-xl py-2.5 sm:py-3 px-3 sm:px-4 focus:ring-green-500 focus:border-green-500 resize-none h-11 sm:h-13 text-sm sm:text-base leading-snug transition-colors"
- onKeyDown={(e) => {
- if (e.key === 'Enter' && !e.shiftKey) {
- e.preventDefault();
- handleSendMessage();
- }
- }}
- />
- </div>
+  // Setup Web Speech API Cleanup
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
- <button
- type="submit"
- disabled={!inputText.trim() || loading}
- aria-label="Send message"
- className="flex-shrink-0 p-2.5 sm:p-3.5 bg-green-600 hover:bg-green-700 text-white rounded-xl disabled:opacity-50 transition-all active:scale-95 shadow-sm"
- >
- <Send className="h-5 w-5 sm:h-6 sm:w-6" />
- </button>
- </form>
- {isListening && (
- <p className="text-center text-red-500 text-xs sm:text-sm font-medium mt-1.5 animate-pulse">
- {t('listening_text')}
- </p>
- )}
- </div>
- </div>
- );
+  const handleReadAloud = (text, idx) => {
+    if (!('speechSynthesis' in window)) {
+      alert("Sorry, your browser doesn't support text to speech!");
+      return;
+    }
+
+    if (playingId === idx) {
+      window.speechSynthesis.cancel();
+      setPlayingId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const cleanText = text
+      .replace(/[*_#`~]/g, '')
+      .replace(/\[.*?\]\(.*?\)/g, '')
+      .replace(/•/g, '');
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    
+    if (lang === 'hi') utterance.lang = 'hi-IN';
+    else if (lang === 'or') utterance.lang = 'or-IN';
+    else utterance.lang = 'en-IN';
+
+    utterance.onend = () => setPlayingId(null);
+    utterance.onerror = () => setPlayingId(null);
+
+    setPlayingId(idx);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
+
+  // Speech Recognition Setup
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+
+      if (lang === 'hi') recognitionRef.current.lang = 'hi-IN';
+      else if (lang === 'or') recognitionRef.current.lang = 'or-IN';
+      else recognitionRef.current.lang = 'en-IN';
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInputText(transcript);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, [lang]);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Voice recognition is not supported in this browser.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (err) {
+        console.error("Error starting speech recognition:", err);
+      }
+    }
+  };
+
+  const handleSendMessage = async (e) => {
+    if (e) e.preventDefault();
+    if (!inputText.trim() || loading) return;
+
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setPlayingId(null);
+    }
+
+    const userMessage = inputText.trim();
+    const updatedUserMessages = [...messages, { role: 'user', text: userMessage }];
+    setMessages(updatedUserMessages);
+    saveCurrentSessionMessages(updatedUserMessages);
+    setInputText('');
+    setLoading(true);
+
+    const district = localStorage.getItem('smartCropLocation') || 'Cuttack';
+    const landArea = parseFloat(localStorage.getItem('smartCropLandArea')) || 2.5;
+
+    try {
+      const response = await apiClient.post('/chat', { 
+        message: userMessage,
+        context: {
+          district: district,
+          season: 'Kharif',
+          area_ha: landArea,
+          language: lang
+        },
+        history: updatedUserMessages
+          .filter(m => !m.isGreeting)
+          .slice(-10)
+          .map(m => ({ role: m.role, text: m.text }))
+      });
+
+      const newMsg = { role: 'assistant', text: response.data.reply };
+      const updatedBotMessages = [...updatedUserMessages, newMsg];
+      setMessages(updatedBotMessages);
+      saveCurrentSessionMessages(updatedBotMessages);
+
+    } catch (error) {
+      const errorMsg = { role: 'assistant', text: "Sorry, I'm having trouble connecting to the agricultural advisory server right now. Please try again." };
+      const updatedErrMessages = [...updatedUserMessages, errorMsg];
+      setMessages(updatedErrMessages);
+      saveCurrentSessionMessages(updatedErrMessages);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className={`flex bg-gray-50 font-sans transition-colors overflow-hidden ${isEmbedded ? 'w-full h-full' : 'max-w-5xl mx-auto h-[calc(100dvh-3.5rem)] sm:h-[calc(100vh-4rem)] rounded-2xl shadow-xl border border-gray-200'}`}>
+      
+      {/* LIGHT MODE LEFT SIDEBAR (History & New Chat) */}
+      <aside 
+        className={`bg-slate-50 text-slate-800 flex flex-col transition-all duration-300 border-r border-slate-200 shrink-0 z-20 ${
+          isSidebarOpen ? 'w-64 sm:w-72' : 'w-0 hidden'
+        }`}
+      >
+        {/* New Chat Button */}
+        <div className="p-3 border-b border-slate-200/80 bg-white/50 flex items-center justify-between">
+          <button
+            onClick={createNewChat}
+            className="flex-1 flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm shadow-xs hover:shadow-md transition-all active:scale-95"
+          >
+            <Plus className="h-4 w-4 stroke-[3]" />
+            <span>New Chat</span>
+          </button>
+        </div>
+
+        {/* Sessions History List Header */}
+        <div className="px-4 py-2.5 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider flex items-center space-x-1.5 border-b border-slate-200/50">
+          <Clock className="h-3.5 w-3.5 text-emerald-600" />
+          <span>Recent Advisory Chats</span>
+        </div>
+
+        {/* History Items Scroll Container */}
+        <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1.5 custom-scrollbar">
+          {sessions.map((sess) => {
+            const isActive = sess.id === currentSessionId;
+            return (
+              <div
+                key={sess.id}
+                onClick={() => selectSession(sess.id)}
+                className={`group flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-all text-xs ${
+                  isActive
+                    ? 'bg-white text-emerald-900 border border-emerald-300 shadow-2xs font-semibold'
+                    : 'text-slate-700 hover:bg-white/80 hover:text-emerald-800'
+                }`}
+              >
+                <div className="flex items-center space-x-2.5 min-w-0 flex-1 pr-1">
+                  <MessageSquare className={`h-4 w-4 shrink-0 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
+                  <div className="truncate min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium leading-snug">{sess.title}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{sess.dateStr || formatDateTime(sess.timestamp)}</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={(e) => deleteSession(sess.id, e)}
+                  className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 p-1 rounded-md transition-opacity"
+                  title="Delete chat thread"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </aside>
+
+      {/* MAIN CHAT AREA */}
+      <div className="flex-1 flex flex-col min-w-0 bg-gray-50 h-full">
+        
+        {/* Top Chat Bar */}
+        <header className="bg-white px-4 py-3 flex items-center justify-between shrink-0 border-b border-gray-200 shadow-2xs">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-1.5 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+              title={isSidebarOpen ? "Collapse History" : "Open History"}
+            >
+              {isSidebarOpen ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeftOpen className="h-5 w-5" />}
+            </button>
+
+            <div className="flex items-center space-x-2.5">
+              <div className="bg-emerald-100 p-2 rounded-full hidden sm:block">
+                <Sprout className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <h1 className="text-base sm:text-lg font-bold text-gray-800 leading-tight">
+                  Krushi Sahayak (କୃଷି ସହାୟକ)
+                </h1>
+                <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> Official Agricultural Advisory Assistant
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={createNewChat}
+            className="sm:hidden flex items-center space-x-1 bg-emerald-600 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>New</span>
+          </button>
+        </header>
+
+        {/* Chat Messages Body */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+          {messages.map((msg, index) => {
+            const isUser = msg.role === 'user';
+            const isReadingThis = playingId === index;
+
+            return (
+              <div
+                key={index}
+                className={`flex items-start space-x-2 sm:space-x-3 ${
+                  isUser ? 'flex-row-reverse space-x-reverse' : ''
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                    isUser
+                      ? 'bg-green-600 text-white shadow-xs'
+                      : 'bg-emerald-700 text-white shadow-xs'
+                  }`}
+                >
+                  {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                </div>
+
+                <div className={`flex flex-col max-w-[85%] sm:max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}>
+                  <div
+                    className={`p-3.5 sm:p-4 rounded-2xl text-sm sm:text-base leading-relaxed shadow-2xs whitespace-pre-line ${
+                      isUser
+                        ? 'bg-green-600 text-white font-medium rounded-tr-none'
+                        : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+
+                  {!isUser && (
+                    <button
+                      onClick={() => handleReadAloud(msg.text, index)}
+                      className={`mt-1.5 flex items-center text-xs px-2.5 py-1 rounded-full border transition-all ${
+                        isReadingThis
+                          ? 'bg-green-100 border-green-300 text-green-700 animate-pulse font-semibold'
+                          : 'bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                      }`}
+                    >
+                      <Volume2 className="h-3.5 w-3.5 mr-1" />
+                      {isReadingThis ? 'Reading...' : 'Read aloud'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {loading && (
+            <div className="flex items-start space-x-3">
+              <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center shrink-0">
+                <Bot className="h-4 w-4" />
+              </div>
+              <div className="bg-white p-4 rounded-2xl rounded-tl-none border border-gray-100 shadow-xs flex items-center space-x-3">
+                <Loader2 className="h-5 w-5 text-green-600 animate-spin" />
+                <span className="text-sm text-gray-500 font-medium">Fetching agricultural advisory...</span>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Form */}
+        <form onSubmit={handleSendMessage} className="p-3 sm:p-4 bg-white border-t border-gray-200 shrink-0">
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={toggleListening}
+              className={`p-2.5 sm:p-3 rounded-full transition-all shrink-0 ${
+                isListening
+                  ? 'bg-red-500 text-white animate-pulse shadow-md'
+                  : 'bg-green-50 text-green-600 hover:bg-green-100'
+              }`}
+              title={isListening ? "Stop listening" : "Speak message"}
+            >
+              {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            </button>
+
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder={isListening ? "Listening..." : "Type your message or tap the mic..."}
+              className="flex-1 border border-gray-300 rounded-full px-4 py-2.5 sm:py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+            />
+
+            <button
+              type="submit"
+              disabled={!inputText.trim() || loading}
+              className="bg-green-600 text-white p-2.5 sm:p-3 rounded-full hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 shadow-xs"
+            >
+              <Send className="h-5 w-5" />
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  );
 };
 
 export default FarmerChat;

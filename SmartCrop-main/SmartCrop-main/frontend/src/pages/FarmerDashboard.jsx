@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import FarmerChat from './FarmerChat';
-import { MapPin, Sprout, TrendingUp, DollarSign, Award, Search, ChevronDown, LocateFixed, LineChart, ShieldCheck, Volume2, Bot, X } from 'lucide-react';
+import { 
+  MapPin, Sprout, TrendingUp, DollarSign, Award, Search, ChevronDown, 
+  LocateFixed, LineChart, ShieldCheck, Volume2, X, User, Sun, Moon, CreditCard 
+} from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import WeatherWidget from '../components/WeatherWidget';
 import CreditScoreGauge from '../components/CreditScoreGauge';
 import LoanInformationModal from '../components/LoanInformationModal';
+import smartBotImg from '../assets/smart_bot.png';
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -23,9 +27,9 @@ const ODISHA_DISTRICTS_COORDS = {
   'Bhadrak': { lat: 21.06, lon: 86.50 },
   'Boudh': { lat: 20.84, lon: 84.32 },
   'Cuttack': { lat: 20.46, lon: 85.88 },
-  'Deogarh': { lat: 21.53, lon: 84.73 },
-  'Dhenkanal': { lat: 20.67, lon: 85.60 },
-  'Gajapati': { lat: 18.81, lon: 84.15 },
+  'Deogarh': { lat: 21.54, lon: 84.73 },
+  'Dhenkanal': { lat: 20.66, lon: 85.60 },
+  'Gajapati': { lat: 18.77, lon: 84.09 },
   'Ganjam': { lat: 19.38, lon: 85.05 },
   'Jagatsinghpur': { lat: 20.27, lon: 86.17 },
   'Jajpur': { lat: 20.85, lon: 86.33 },
@@ -48,16 +52,163 @@ const ODISHA_DISTRICTS_COORDS = {
   'Sundargarh': { lat: 22.12, lon: 84.03 }
 };
 
+const CROP_NAME_MAP = {
+  Rice: { hi: "धान", or: "ଧାନ" },
+  Ragi: { hi: "रागी (मडुआ)", or: "ମାଣ୍ଡିଆ (ରାଗି)" },
+  "Moong(Green Gram)": { hi: "मूंग (हरा चना)", or: "ମୁଗ (ସବୁଜ ଡାଲି)" },
+  Moong: { hi: "मूंग (हरा चना)", or: "ମୁଗ (ସବୁଜ ଡାଲି)" },
+  Groundnut: { hi: "मूंगफली", or: "ଚିନାବାଦାମ" },
+  Jute: { hi: "जूट", or: "ଜୋଟ" },
+  Maize: { hi: "मक्का", or: "ମକା" },
+  Cotton: { hi: "कपास", or: "କପା" },
+  Sugarcane: { hi: "गन्ना", or: "ଖୁସି" },
+  Pulses: { hi: "दालें", or: "ଡାଲି" },
+  Sesamum: { hi: "तिल", or: "ଖସା" },
+  Wheat: { hi: "गेहूं", or: "ଗହମ" },
+  Mustard: { hi: "सरसों", or: "ସୋରିଷ" },
+  Potato: { hi: "आलू", or: "ଆଳୁ" },
+  Urad: { hi: "उड़द", or: "ବିରି" },
+  Arhar: { hi: "अरहर", or: "ହରଡ" },
+  Gram: { hi: "चना", or: "ବୁଟ" }
+};
+
+const MandiPriceChart = ({ prices, cropName, isDarkMode }) => {
+  const { priceToday, price15, price30, price90 } = prices;
+  const pts = [
+    { label: 'Today', val: priceToday, pct: 'Base', x: 50 },
+    { label: '+15 Days', val: price15, pct: '+3.8%', x: 180 },
+    { label: '+30 Days', val: price30, pct: '+7.5%', x: 310 },
+    { label: '+90 Days', val: price90, pct: '+13.4%', x: 440 }
+  ];
+
+  const minV = Math.min(...pts.map(p => p.val)) * 0.96;
+  const maxV = Math.max(...pts.map(p => p.val)) * 1.04;
+  const range = maxV - minV || 1;
+
+  const getY = (val) => 110 - ((val - minV) / range) * 75;
+
+  const pointsWithY = pts.map(p => ({ ...p, y: getY(p.val) }));
+
+  const pathD = `M ${pointsWithY[0].x} ${pointsWithY[0].y} ` +
+    pointsWithY.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+
+  const areaD = `${pathD} L ${pointsWithY[pointsWithY.length - 1].x} 130 L ${pointsWithY[0].x} 130 Z`;
+
+  return (
+    <div className={`mt-5 p-4.5 rounded-2xl border transition-all duration-300 ${
+      isDarkMode 
+        ? 'bg-slate-900 border-slate-700 text-white shadow-xl' 
+        : 'bg-emerald-50/80 border-emerald-200/90 text-emerald-950 shadow-2xs'
+    }`}>
+      <div className="flex justify-between items-center mb-3 px-1">
+        <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+          isDarkMode ? 'text-emerald-400' : 'text-emerald-900'
+        }`}>
+          <LineChart className="h-4 w-4 text-emerald-600" /> Mandi Price Trend Graph (₹/Quintal)
+        </span>
+        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+          isDarkMode ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-emerald-200/80 text-emerald-900 border-emerald-300'
+        }`}>
+          Seasonal Market Rally
+        </span>
+      </div>
+
+      <div className="relative w-full overflow-hidden pt-2">
+        <svg viewBox="0 0 500 150" className="w-full h-36 sm:h-44 overflow-visible">
+          <defs>
+            <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines */}
+          <line x1="30" y1="35" x2="470" y2="35" stroke={isDarkMode ? "#334155" : "#cbd5e1"} strokeDasharray="3 3" strokeWidth="1" />
+          <line x1="30" y1="75" x2="470" y2="75" stroke={isDarkMode ? "#334155" : "#cbd5e1"} strokeDasharray="3 3" strokeWidth="1" />
+          <line x1="30" y1="115" x2="470" y2="115" stroke={isDarkMode ? "#334155" : "#cbd5e1"} strokeDasharray="3 3" strokeWidth="1" />
+
+          {/* Area Fill */}
+          <path d={areaD} fill="url(#priceGradient)" />
+
+          {/* Line Chart */}
+          <path d={pathD} fill="none" stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* Data Points and Labels */}
+          {pointsWithY.map((pt, idx) => (
+            <g key={idx} className="group cursor-pointer">
+              {/* Outer pulsing ring */}
+              <circle cx={pt.x} cy={pt.y} r="7" fill="#059669" className="animate-ping opacity-30" />
+              {/* Core Circle */}
+              <circle cx={pt.x} cy={pt.y} r="5" fill="#34d399" stroke="#ffffff" strokeWidth="2" />
+              
+              {/* Price text above point */}
+              <text 
+                x={pt.x} 
+                y={pt.y - 12} 
+                textAnchor="middle" 
+                className={`text-[11px] font-black tracking-tight ${isDarkMode ? 'fill-emerald-300' : 'fill-emerald-800'}`}
+              >
+                ₹{pt.val.toLocaleString('en-IN')}
+              </text>
+
+              {/* Time Label below X axis */}
+              <text 
+                x={pt.x} 
+                y="145" 
+                textAnchor="middle" 
+                className={`text-[10px] font-extrabold uppercase tracking-wider ${isDarkMode ? 'fill-slate-400' : 'fill-slate-600'}`}
+              >
+                {pt.label}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+};
+
 const FarmerDashboard = () => {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   
-  const [location, setLocation] = useState(() => {
-    return localStorage.getItem('smartCropLocation') || 'Cuttack';
+  // Theme Mode State (Light ☀️ / Dark 🌙)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('smartCropTheme') === 'dark';
   });
+
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => {
+      const next = !prev;
+      localStorage.setItem('smartCropTheme', next ? 'dark' : 'light');
+      return next;
+    });
+  };
+
+  // Retrieve saved farmer profile from login registration
+  const [farmerProfile, setFarmerProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem('smartCropFarmerProfile');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  const [location, setLocation] = useState(() => {
+    return farmerProfile?.district || localStorage.getItem('smartCropLocation') || 'Cuttack';
+  });
+
   const [season, setSeason] = useState('Kharif');
-  const [areaHa, setAreaHa] = useState(2.5);
+
+  const [areaHa, setAreaHa] = useState(() => {
+    const savedArea = localStorage.getItem('smartCropLandArea');
+    if (savedArea) return parseFloat(savedArea) || 2.5;
+    return farmerProfile?.land_area_ha || 2.5;
+  });
+
   const [isLocating, setIsLocating] = useState(false);
-  const [locationNotice, setLocationNotice] = useState('📍 Requesting location permission...');
+  const [gpsActive, setGpsActive] = useState(false);
+  const [locationNotice, setLocationNotice] = useState('📍 Requesting browser location permission...');
   const [showLocationSelect, setShowLocationSelect] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const locationRef = useRef(null);
@@ -78,25 +229,66 @@ const FarmerDashboard = () => {
   const [selectedCrop, setSelectedCrop] = useState('Rice');
   const [analysisData, setAnalysisData] = useState(null);
 
-  useEffect(() => {
-    localStorage.setItem('smartCropLocation', location);
-  }, [location]);
+  const getLocalizedCropName = (rawName) => {
+    if (!rawName) return rawName;
+    const entry = CROP_NAME_MAP[rawName];
+    if (!entry) return rawName;
+    return entry[lang] || rawName;
+  };
+
+  const getNearestDistrict = (lat, lon) => {
+    let nearest = 'Cuttack';
+    let minDistance = Infinity;
+
+    Object.entries(ODISHA_DISTRICTS_COORDS).forEach(([distName, coords]) => {
+      const dLat = coords.lat - lat;
+      const dLon = coords.lon - lon;
+      const distSq = dLat * dLat + dLon * dLon;
+      if (distSq < minDistance) {
+        minDistance = distSq;
+        nearest = distName;
+      }
+    });
+    return nearest;
+  };
+
+  const requestBrowserLocation = () => {
+    if (!('geolocation' in navigator)) {
+      setLocationNotice('⚠️ Geolocation not supported by browser. Using default: ' + location);
+      return;
+    }
+
+    setIsLocating(true);
+    setLocationNotice('🛰️ Accessing GPS coordinates...');
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const detectedDistrict = getNearestDistrict(latitude, longitude);
+        setLocation(detectedDistrict);
+        setGpsActive(true);
+        setIsLocating(false);
+        setLocationNotice(`✅ GPS Located: ${detectedDistrict} (${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°)`);
+        localStorage.setItem('smartCropLocation', detectedDistrict);
+        runFullPipeline(detectedDistrict, season, areaHa, loanProfile);
+      },
+      (error) => {
+        console.warn("GPS Permission error:", error);
+        setIsLocating(false);
+        setGpsActive(false);
+        setLocationNotice(`📍 Default Location: ${location} (Grant GPS permission in browser for live location)`);
+        runFullPipeline(location, season, areaHa, loanProfile);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
+    );
+  };
 
   useEffect(() => {
-    localStorage.setItem('farmerLoanProfile', JSON.stringify(loanProfile));
-  }, [loanProfile]);
+    requestBrowserLocation();
 
-  useEffect(() => {
-    const handleToggleChat = () => setIsAssistantOpen(prev => !prev);
     const handleOpenLoan = () => setIsLoanModalOpen(true);
-
-    window.addEventListener('toggleSmartAssistant', handleToggleChat);
     window.addEventListener('openLoanModal', handleOpenLoan);
-
-    return () => {
-      window.removeEventListener('toggleSmartAssistant', handleToggleChat);
-      window.removeEventListener('openLoanModal', handleOpenLoan);
-    };
+    return () => window.removeEventListener('openLoanModal', handleOpenLoan);
   }, []);
 
   useEffect(() => {
@@ -109,59 +301,14 @@ const FarmerDashboard = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const getNearestDistrict = (lat, lon) => {
-    let minDistance = Infinity;
-    let nearest = "Cuttack";
-    for (const [district, coords] of Object.entries(ODISHA_DISTRICTS_COORDS)) {
-      const dist = Math.hypot(lat - coords.lat, lon - coords.lon);
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearest = district;
-      }
-    }
-    return nearest;
+  const handleSelectDistrict = (distName) => {
+    setLocation(distName);
+    setShowLocationSelect(false);
+    localStorage.setItem('smartCropLocation', distName);
+    runFullPipeline(distName, season, areaHa, loanProfile);
   };
 
-  const detectCurrentLocation = () => {
-    if ('geolocation' in navigator) {
-      setIsLocating(true);
-      setLocationNotice('📍 Requesting GPS location permission from browser...');
-
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          try {
-            const { latitude, longitude } = position.coords;
-            const nearest = getNearestDistrict(latitude, longitude);
-            setLocation(nearest);
-            setShowLocationSelect(false);
-            setLocationNotice(`📍 Location Active: Detected District "${nearest}"`);
-            runFullPipeline(nearest, season, areaHa, loanProfile);
-          } catch (error) {
-            console.error("Location error:", error);
-            setLocationNotice(`📍 Location Note: Defaulting to ${location}.`);
-          } finally {
-            setIsLocating(false);
-          }
-        },
-        (error) => {
-          console.warn("Geolocation permission denied or timed out:", error.message);
-          setIsLocating(false);
-          setLocationNotice(`📍 Location permission ${error.code === 1 ? 'denied' : 'unavailable'}. Using selected district "${location}".`);
-          runFullPipeline(location, season, areaHa, loanProfile);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
-      setLocationNotice(`📍 Location not supported by browser. Using selected district "${location}".`);
-      runFullPipeline(location, season, areaHa, loanProfile);
-    }
-  };
-
-  useEffect(() => {
-    detectCurrentLocation();
-  }, []);
-
-  const runFullPipeline = async (distName = location, seasonName = season, areaVal = areaHa, currentLoan = loanProfile) => {
+  const runFullPipeline = async (distName, seasonName, areaVal, currentLoan) => {
     setLoading(true);
     
     try {
@@ -219,6 +366,8 @@ const FarmerDashboard = () => {
 
   const handleSaveLoanProfile = (updatedProfile) => {
     setLoanProfile(updatedProfile);
+    localStorage.setItem('farmerLoanProfile', JSON.stringify(updatedProfile));
+    window.dispatchEvent(new CustomEvent('loanProfileUpdated'));
     runFullPipeline(location, season, areaHa, updatedProfile);
   };
 
@@ -248,7 +397,7 @@ const FarmerDashboard = () => {
         return;
       }
     }
-    const recCrop = analysisData?.crop_recommendation?.recommended_crop || selectedCrop || 'Rice';
+    const recCrop = getLocalizedCropName(analysisData?.crop_recommendation?.recommended_crop || selectedCrop || 'Rice');
     const baseP = analysisData?.market_price_summary?.mandi_price_per_quintal || 2300;
     const { price30 } = getPriceForecast(baseP);
     const text = `Recommended crop for ${location} is ${recCrop}. Current price is ${baseP} rupees per quintal, expected to reach ${price30} rupees in 30 days.`;
@@ -273,25 +422,80 @@ const FarmerDashboard = () => {
 
   const basePrice = analysisData?.market_price_summary?.mandi_price_per_quintal || 2300;
   const priceForecast = getPriceForecast(basePrice);
+  const rawTopCrop = analysisData?.crop_recommendation?.recommended_crop || selectedCrop || 'Rice';
+  const localizedTopCrop = getLocalizedCropName(rawTopCrop);
+
+  const farmerName = farmerProfile?.first_name 
+    ? `${farmerProfile.first_name} ${farmerProfile.last_name || ''}`.trim()
+    : null;
 
   return (
-    <div className="w-full px-3 sm:px-6 lg:px-8 py-4 min-h-[calc(100vh-4.2rem)] flex flex-col relative">
+    <div className={`w-full px-3 sm:px-6 lg:px-8 py-4 min-h-[calc(100vh-4.2rem)] flex flex-col relative transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-gray-100 text-gray-900'}`}>
       
       {/* Full-Width Dashboard Container */}
-      <div className="w-full bg-white rounded-3xl shadow-sm border border-gray-200 p-4 sm:p-7 flex flex-col space-y-5">
+      <div className={`w-full rounded-3xl shadow-sm border p-4 sm:p-7 flex flex-col space-y-5 transition-colors duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-gray-200 text-gray-900'}`}>
         
-        {/* Header & Credit Score Gauge Meter */}
-        <div className="flex items-center justify-between pb-4 border-b border-gray-200 flex-wrap gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-emerald-100/80 rounded-2xl border border-emerald-200">
-              <Sprout className="h-7 w-7 text-emerald-700 shrink-0" />
+        {/* FRESH PROMINENT UI HEADER BANNER WITH THEME TOGGLE BUTTON */}
+        <div className={`p-5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs transition-colors duration-300 ${isDarkMode ? 'bg-slate-800/90 border-slate-700' : 'bg-gradient-to-r from-emerald-50 via-green-50/80 to-emerald-100/60 border-emerald-200/90'}`}>
+          <div className="flex items-center space-x-3.5">
+            <div className="p-3 bg-emerald-600 rounded-2xl text-white shadow-md shrink-0">
+              <Sprout className="h-8 w-8" />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Smart Farm Advisory & Insights</h2>
-              <p className="text-xs text-gray-500 font-medium mt-0.5">Risk-Aware Crop Recommendation & Farmer Financial Credit Health</p>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className={`text-2xl sm:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {t('smart_farm_advisory_title')}
+                </h1>
+                
+                {farmerName && (
+                  <span className="bg-emerald-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-full flex items-center shadow-2xs">
+                    <User className="h-3.5 w-3.5 mr-1" />
+                    {farmerName}
+                  </span>
+                )}
+
+                {/* EDIT LOAN & FINANCIAL PROFILE BUTTON */}
+                <button
+                  onClick={() => setIsLoanModalOpen(true)}
+                  className="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-2xl text-xs font-black shadow-md hover:shadow-lg transition-all active:scale-95 border border-emerald-400 cursor-pointer"
+                  title="Edit Loan & Financial Profile"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  <span>💳 Loan & Financial Profile</span>
+                </button>
+
+                {/* PROMINENT FAT LIGHT / DARK MODE TOGGLE BUTTON */}
+                <button
+                  onClick={toggleDarkMode}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-xs sm:text-sm font-black shadow-md hover:shadow-lg transition-all active:scale-95 border cursor-pointer ${
+                    isDarkMode
+                      ? 'bg-slate-800 text-amber-300 border-slate-600 hover:bg-slate-700'
+                      : 'bg-white text-slate-800 border-gray-300 hover:bg-gray-50'
+                  }`}
+                  title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                >
+                  {isDarkMode ? (
+                    <>
+                      <Sun className="h-4.5 w-4.5 text-amber-400 fill-amber-400" />
+                      <span>☀️ Light Mode</span>
+                    </>
+                  ) : (
+                    <>
+                      <Moon className="h-4.5 w-4.5 text-slate-700 fill-slate-700" />
+                      <span>🌙 Dark Mode</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className={`text-xs sm:text-sm font-semibold mt-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>
+                {t('smart_farm_advisory_subtitle')}
+              </p>
             </div>
           </div>
+        </div>
 
+        {/* FULL-WIDTH FINANCIAL HEALTH DISTRESS CARD (WITH SPECTRUM RANGE SCALE) */}
+        <div>
           <CreditScoreGauge
             score={farmerFinancial.loan_distress_score || 0}
             category={farmerFinancial.distress_category || "Very Low"}
@@ -300,61 +504,74 @@ const FarmerDashboard = () => {
           />
         </div>
 
+        {/* Location Status Notice Banner */}
+        <div className={`flex items-center justify-between border rounded-xl px-4 py-2 text-xs font-semibold ${isDarkMode ? 'bg-blue-950/60 border-blue-800 text-blue-200' : 'bg-blue-50/80 border-blue-200 text-blue-900'}`}>
+          <span className="flex items-center">
+            <LocateFixed className={`h-4 w-4 mr-2 text-blue-500 ${isLocating ? 'animate-spin' : ''}`} />
+            {locationNotice}
+          </span>
+          <button 
+            onClick={requestBrowserLocation}
+            className="text-[11px] font-extrabold bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg transition-all shadow-2xs shrink-0"
+          >
+            {isLocating ? 'Detecting GPS...' : '📍 Request Location Access'}
+          </button>
+        </div>
+
         {/* Controls: Location, Season & Land Area */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-50/90 p-4.5 rounded-2xl border border-gray-200">
+        <div className={`grid grid-cols-1 sm:grid-cols-3 gap-4 p-4.5 rounded-2xl border transition-colors duration-300 ${isDarkMode ? 'bg-slate-800/80 border-slate-700 text-slate-100' : 'bg-gray-50/90 border-gray-200 text-gray-900'}`}>
           
           {/* District Selector */}
           <div className="relative" ref={locationRef}>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">📍 District / Location</label>
+            <label className={`block text-xs font-bold uppercase mb-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>📍 {t('district_location')}</label>
             <div 
-              className="flex items-center justify-between bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-gray-800 cursor-pointer hover:border-green-500 transition-colors shadow-2xs"
+              className={`flex items-center justify-between border rounded-xl px-3.5 py-2.5 text-sm font-semibold cursor-pointer hover:border-green-500 transition-colors shadow-2xs ${isDarkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-gray-800 border-gray-300'}`}
               onClick={() => { setShowLocationSelect(!showLocationSelect); setSearchQuery(''); }}
             >
               <div className="flex items-center truncate">
                 <MapPin className="h-4 w-4 text-red-500 mr-2 shrink-0" />
                 <span className="truncate">{location}</span>
+                {gpsActive && (
+                  <span className="ml-2 text-[9px] bg-green-100 text-green-800 font-extrabold px-1.5 py-0.5 rounded">GPS</span>
+                )}
               </div>
               <ChevronDown className={`h-4 w-4 text-gray-400 shrink-0 transition-transform ${showLocationSelect ? 'rotate-180' : ''}`} />
             </div>
 
             {showLocationSelect && (
-              <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
-                <div className="p-2 border-b border-gray-100 bg-gray-50">
+              <div className={`absolute top-full left-0 mt-1 w-64 rounded-2xl shadow-2xl border z-50 overflow-hidden ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
+                <div className={`p-2 border-b ${isDarkMode ? 'border-slate-700 bg-slate-900' : 'border-gray-100 bg-gray-50'}`}>
                   <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
                     <input
                       type="text"
-                      className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-green-500 outline-none"
-                      placeholder="Search district..."
+                      className={`w-full pl-9 pr-3 py-1.5 border rounded-lg text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white focus:ring-green-500' : 'bg-white border-gray-200 text-gray-800 focus:ring-green-500'}`}
+                      placeholder={t('search_district_placeholder')}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
                     />
                   </div>
                 </div>
-                <div className="max-h-56 overflow-y-auto py-1">
-                  <div 
-                    onClick={detectCurrentLocation}
-                    className="px-3 py-2 text-xs cursor-pointer flex items-center text-blue-600 hover:bg-blue-50 font-semibold border-b border-gray-100"
-                  >
-                    <LocateFixed className={`h-4 w-4 mr-2 ${isLocating ? 'animate-pulse' : ''}`} />
-                    <span>{isLocating ? 'Detecting...' : 'Use Current Location'}</span>
-                  </div>
-                  {filteredDistricts.map(dist => (
-                    <div
-                      key={dist}
-                      onClick={() => {
-                        setLocation(dist);
-                        setShowLocationSelect(false);
-                        runFullPipeline(dist, season, areaHa, loanProfile);
-                      }}
-                      className={`px-3 py-1.5 text-xs cursor-pointer flex items-center justify-between ${
-                        location === dist ? 'bg-green-50 text-green-700 font-bold' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {dist}
-                    </div>
-                  ))}
+                <div className="max-h-48 overflow-y-auto p-1.5 space-y-0.5">
+                  {filteredDistricts.length > 0 ? (
+                    filteredDistricts.map(dist => (
+                      <div
+                        key={dist}
+                        onClick={() => handleSelectDistrict(dist)}
+                        className={`px-3 py-2 text-xs font-semibold rounded-lg flex items-center justify-between cursor-pointer ${
+                          location === dist 
+                            ? 'bg-emerald-600 text-white' 
+                            : isDarkMode ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-green-50 text-gray-700'
+                        }`}
+                      >
+                        <span>{dist}</span>
+                        {location === dist && <span className="text-[10px] uppercase tracking-wider font-extrabold">{t('selected')}</span>}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-gray-400 text-center font-medium">{t('no_districts_found')}</div>
+                  )}
                 </div>
               </div>
             )}
@@ -362,24 +579,24 @@ const FarmerDashboard = () => {
 
           {/* Season Selector */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">🗓️ Season</label>
+            <label className={`block text-xs font-bold uppercase mb-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>🗓️ {t('farming_season')}</label>
             <select 
-              value={season}
+              value={season} 
               onChange={(e) => {
                 setSeason(e.target.value);
                 runFullPipeline(location, e.target.value, areaHa, loanProfile);
               }}
-              className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none shadow-2xs"
+              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-green-500 outline-none shadow-2xs cursor-pointer ${isDarkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-gray-800 border-gray-300'}`}
             >
-              <option value="Kharif">Kharif (Monsoon)</option>
-              <option value="Rabi">Rabi (Winter)</option>
-              <option value="Summer">Summer (Pre-Monsoon)</option>
+              <option value="Kharif">{t('kharif_monsoon')}</option>
+              <option value="Rabi">{t('rabi_winter')}</option>
+              <option value="Summer">{t('summer')}</option>
             </select>
           </div>
 
           {/* Land Area Input */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">📐 Land Area (Hectares)</label>
+            <label className={`block text-xs font-bold uppercase mb-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>📐 {t('land_area')}</label>
             <input 
               type="number"
               step="0.1"
@@ -387,7 +604,7 @@ const FarmerDashboard = () => {
               value={areaHa}
               onChange={(e) => setAreaHa(parseFloat(e.target.value) || 1.0)}
               onBlur={() => runFullPipeline(location, season, areaHa, loanProfile)}
-              className="w-full bg-white border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none shadow-2xs"
+              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-green-500 outline-none shadow-2xs ${isDarkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-gray-800 border-gray-300'}`}
             />
           </div>
         </div>
@@ -398,244 +615,232 @@ const FarmerDashboard = () => {
         </div>
 
         {/* Regional Soil Profile */}
-        <div className="bg-emerald-50/80 border border-emerald-200/90 rounded-2xl p-4">
-          <div className="flex justify-between items-center mb-3 text-xs font-bold text-emerald-900">
-            <span>🌱 Regional Soil Chemistry Profile</span>
-            <span className="bg-emerald-200/70 px-2.5 py-1 rounded-md text-emerald-900 font-bold">{location} Soil Profile</span>
+        <div className={`border rounded-2xl p-4 transition-colors ${isDarkMode ? 'bg-emerald-950/40 border-emerald-800 text-slate-100' : 'bg-emerald-50/80 border-emerald-200/90 text-emerald-900'}`}>
+          <div className="flex justify-between items-center mb-3 text-xs font-bold">
+            <span>🌱 {t('regional_soil_chemistry_profile')}</span>
+            <span className="bg-emerald-700 text-white px-2.5 py-1 rounded-md font-bold">{location} {t('soil_profile_badge')}</span>
           </div>
           <div className="grid grid-cols-4 gap-3.5 text-center">
-            <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-2xs">
-              <span className="block text-[10px] font-bold text-gray-500 uppercase">Nitrogen (N)</span>
-              <span className="text-lg font-black text-emerald-700">{soilProfile.N} <xs className="text-[10px]">kg/ha</xs></span>
+            <div className={`p-3 rounded-xl border shadow-2xs ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-emerald-100'}`}>
+              <span className="block text-[10px] font-bold text-gray-400 uppercase">{t('nitrogen')}</span>
+              <span className="text-lg font-black text-emerald-500">{soilProfile.N} <xs className="text-[10px]">kg/ha</xs></span>
             </div>
-            <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-2xs">
-              <span className="block text-[10px] font-bold text-gray-500 uppercase">Phosphorus (P)</span>
-              <span className="text-lg font-black text-emerald-700">{soilProfile.P} <xs className="text-[10px]">kg/ha</xs></span>
+            <div className={`p-3 rounded-xl border shadow-2xs ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-emerald-100'}`}>
+              <span className="block text-[10px] font-bold text-gray-400 uppercase">{t('phosphorus')}</span>
+              <span className="text-lg font-black text-emerald-500">{soilProfile.P} <xs className="text-[10px]">kg/ha</xs></span>
             </div>
-            <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-2xs">
-              <span className="block text-[10px] font-bold text-gray-500 uppercase">Potassium (K)</span>
-              <span className="text-lg font-black text-emerald-700">{soilProfile.K} <xs className="text-[10px]">kg/ha</xs></span>
+            <div className={`p-3 rounded-xl border shadow-2xs ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-emerald-100'}`}>
+              <span className="block text-[10px] font-bold text-gray-400 uppercase">{t('potassium')}</span>
+              <span className="text-lg font-black text-emerald-500">{soilProfile.K} <xs className="text-[10px]">kg/ha</xs></span>
             </div>
-            <div className="bg-white p-3 rounded-lg border border-emerald-100 shadow-2xs">
-              <span className="block text-[10px] font-bold text-gray-500 uppercase">Soil pH</span>
-              <span className="text-lg font-black text-emerald-700">{soilProfile.pH}</span>
+            <div className={`p-3 rounded-lg border shadow-2xs ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-emerald-100'}`}>
+              <span className="block text-[10px] font-bold text-gray-400 uppercase">{t('soil_ph')}</span>
+              <span className="text-lg font-black text-emerald-500">{soilProfile.pH}</span>
             </div>
           </div>
         </div>
 
         {/* FARM ADVISORY ANALYSIS RESULTS */}
         {loading ? (
-          <div className="p-12 text-center bg-gray-50 rounded-3xl border border-gray-200">
-            <div className="inline-block animate-spin text-emerald-600 text-3xl mb-3">🌾</div>
-            <p className="text-base font-bold text-gray-700">Evaluating Risk-Balanced Crop Recommendations & Financial Safety...</p>
+          <div className="py-12 flex flex-col items-center justify-center space-y-3">
+            <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-sm font-bold text-gray-500">{t('analyzing_farm_data')}</p>
           </div>
         ) : analysisData ? (
-          <div className="space-y-4">
+          <div className="space-y-6 animate-in fade-in duration-300">
             
-            {/* TOP RECOMMENDED CROP */}
-            <div className="bg-gradient-to-r from-emerald-600 via-green-700 to-emerald-800 text-white rounded-3xl p-6 shadow-md text-center relative overflow-hidden">
-              <div className="inline-flex items-center space-x-1.5 bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black text-amber-300 mb-2">
-                <Award className="h-4 w-4 mr-1 text-amber-300" />
-                <span>TOP RECOMMENDED CROP (RISK-BALANCED)</span>
+            {/* RECOMMENDED CROP MAIN DISPLAY */}
+            <div className={`p-6 sm:p-7 rounded-3xl border shadow-md relative overflow-hidden transition-colors ${isDarkMode ? 'bg-slate-800/90 border-emerald-500/40 text-slate-100' : 'bg-gradient-to-br from-emerald-50 via-white to-green-50/40 border-emerald-200'}`}>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-emerald-200/60 pb-5">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="bg-emerald-600 text-white font-extrabold text-[11px] px-3 py-1 rounded-full uppercase tracking-wider shadow-2xs">
+                      🏆 {t('top_recommended_crop')}
+                    </span>
+                    <span className="bg-emerald-100 text-emerald-800 font-bold text-xs px-2.5 py-1 rounded-full">
+                      {location} • {season}
+                    </span>
+                  </div>
+                  <h2 className={`text-3xl sm:text-4xl font-black mt-2 tracking-tight ${isDarkMode ? 'text-emerald-400' : 'text-emerald-950'}`}>
+                    {localizedTopCrop}
+                  </h2>
+                </div>
+
+                <div className="text-left sm:text-right bg-white p-3.5 rounded-2xl border border-emerald-100 shadow-2xs">
+                  <span className="block text-[10px] font-bold text-gray-500 uppercase">{t('current_mandi_price')}</span>
+                  <span className="text-2xl font-black text-emerald-700">₹{basePrice.toLocaleString('en-IN')} <xs className="text-xs font-semibold text-gray-500">/qtl</xs></span>
+                </div>
               </div>
-              <h3 className="text-4xl sm:text-5xl font-black tracking-tight my-1">
-                {analysisData.crop_recommendation?.recommended_crop || selectedCrop || 'Rice'}
-              </h3>
+
+              {/* Crop Analysis Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-5">
+                <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-emerald-100'}`}>
+                  <span className="block text-[10px] font-bold text-gray-500 uppercase">{t('expected_yield')}</span>
+                  <span className="text-lg font-extrabold text-emerald-600">{analysisData.crop_recommendation?.yield_per_ha || 3.65} t/ha</span>
+                  <span className="block text-[10px] text-gray-400 font-medium mt-0.5">Total ~{((analysisData.crop_recommendation?.yield_per_ha || 3.65) * areaHa).toFixed(1)} Tons</span>
+                </div>
+                <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-emerald-100'}`}>
+                  <span className="block text-[10px] font-bold text-gray-500 uppercase">{t('expected_net_profit')}</span>
+                  <span className="text-lg font-extrabold text-emerald-600">{analysisData.profit_analysis?.formatted_profit || `₹${((3.65 * areaHa * 23000) - (75000 * areaHa)).toLocaleString('en-IN')}`}</span>
+                  <span className="block text-[10px] text-gray-400 font-medium mt-0.5">{areaHa} Ha Total Land</span>
+                </div>
+                <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-emerald-100'}`}>
+                  <span className="block text-[10px] font-bold text-gray-500 uppercase">{t('cultivation_cost')}</span>
+                  <span className="text-lg font-extrabold text-gray-700">₹{(75000 * areaHa).toLocaleString('en-IN')}</span>
+                  <span className="block text-[10px] text-gray-400 font-medium mt-0.5">₹75,000 / ha</span>
+                </div>
+                <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-emerald-100'}`}>
+                  <span className="block text-[10px] font-bold text-gray-500 uppercase">{t('profit_margin')}</span>
+                  <span className="text-lg font-extrabold text-emerald-600">+{analysisData.profit_analysis?.roi_percent || 19.1}%</span>
+                  <span className="block text-[10px] text-gray-400 font-medium mt-0.5">Return on Investment</span>
+                </div>
+              </div>
+
+              {/* Recommendation Rationale */}
+              {analysisData.crop_recommendation?.reasons && (
+                <div className="mt-5 pt-4 border-t border-emerald-200/50">
+                  <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2">💡 {t('why_this_crop_was_recommended')}</h4>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium text-gray-700">
+                    {analysisData.crop_recommendation.reasons.map((reason, idx) => (
+                      <li key={idx} className="flex items-center">
+                        <ShieldCheck className="h-4 w-4 text-emerald-600 mr-2 shrink-0" />
+                        <span>{reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
-            {/* TOP 3 CANDIDATE CROPS RANKING TABLE */}
+            {/* CANDIDATE CROPS COMPARISON TABLE */}
             {candidateCrops.length > 0 && (
-              <div className="bg-emerald-50/70 border border-emerald-200/90 rounded-2xl p-4.5 text-slate-800 space-y-3.5 shadow-xs">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs font-black text-emerald-900 flex items-center">
-                    <ShieldCheck className="h-5 w-5 mr-2 text-emerald-600" />
-                    TOP 3 RISK-BALANCED CANDIDATE CROPS
-                  </span>
-                  <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-3 py-1 rounded-full">
-                    40% Suitability + 35% Profit + 25% Safety
-                  </span>
-                </div>
-                
-                <div className="space-y-2.5">
-                  {candidateCrops.map((c, idx) => (
-                    <div key={c.crop || idx} className="bg-white border border-emerald-100/90 rounded-xl p-3.5 flex flex-col space-y-1.5 shadow-2xs">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2.5">
-                          <span className="bg-emerald-600 text-white font-black text-xs px-3 py-1 rounded-full shadow-2xs">
-                            Rank #{c.rank || idx + 1}
-                          </span>
-                          <span className="font-extrabold text-base text-slate-900">{c.crop}</span>
-                        </div>
-                        <div className="flex items-center gap-4 text-xs">
-                          <span className="text-slate-600 font-semibold">
-                            Est. Profit: <strong className={c.expected_net_profit >= 0 ? "text-emerald-700 font-black text-sm" : "text-red-600 font-black text-sm"}>₹{c.expected_net_profit?.toLocaleString('en-IN')}</strong>
-                          </span>
-                          <span className="text-slate-600 font-semibold">
-                            Safety Score: <strong className="text-blue-700 font-black text-sm">{c.safety_score}/100</strong>
-                          </span>
-                          <span className="text-slate-600 font-semibold">
-                            Final Crop Score: <strong className="text-amber-700 font-black text-sm">{c.final_crop_score}</strong>
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-600 font-medium leading-normal">
-                        💡 {c.recommendation_reason}
-                      </p>
-                    </div>
-                  ))}
+              <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+                <h3 className="text-sm font-extrabold text-gray-800 uppercase tracking-wider mb-3.5 flex items-center">
+                  <Award className="h-4 w-4 text-emerald-600 mr-2" />
+                  {t('risk_balanced_candidate_crops_comparison')}
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className={`border-b text-[10px] uppercase font-bold text-gray-500 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-50 border-gray-200'}`}>
+                        <th className="p-3">{t('crop')}</th>
+                        <th className="p-3">{t('agronomic_fit')}</th>
+                        <th className="p-3">{t('expected_net_profit')}</th>
+                        <th className="p-3">{t('cultivation_cost')}</th>
+                        <th className="p-3">{t('safety_score')}</th>
+                        <th className="p-3">{t('action')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 font-semibold">
+                      {candidateCrops.map((c, idx) => {
+                        const cropName = c.crop || 'Crop';
+                        const locCrop = getLocalizedCropName(cropName);
+                        const isRecommended = rawTopCrop.toLowerCase() === cropName.toLowerCase();
+                        
+                        return (
+                          <tr key={idx} className={`hover:bg-emerald-50/40 transition-colors ${isRecommended ? (isDarkMode ? 'bg-emerald-950/30' : 'bg-emerald-50/60') : ''}`}>
+                            <td className="p-3 font-bold text-gray-900 flex items-center">
+                              {locCrop}
+                              {isRecommended && (
+                                <span className="ml-2 bg-emerald-600 text-white text-[9px] px-2 py-0.5 rounded-full uppercase font-black">
+                                  {t('top_pick')}
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3 text-emerald-700 font-extrabold">{c.suitability_score}%</td>
+                            <td className="p-3 text-emerald-700 font-extrabold">₹{c.expected_net_profit?.toLocaleString('en-IN')}</td>
+                            <td className="p-3 text-gray-600">₹{c.total_cultivation_cost?.toLocaleString('en-IN')}</td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
+                                c.safety_score >= 80 ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {c.safety_score}/100
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <button
+                                onClick={() => setSelectedCrop(cropName)}
+                                className="text-emerald-700 hover:text-emerald-900 font-bold hover:underline"
+                              >
+                                {t('view_insights')}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
 
-            {/* EXPECTED YIELD & HARVEST PREDICTION */}
-            <div className="bg-white border border-emerald-200 rounded-2xl p-4.5 shadow-xs">
+            {/* MANDI PRICE FORECAST CARD */}
+            <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
               <div className="flex justify-between items-center mb-3">
-                <span className="text-xs font-extrabold text-green-900 flex items-center">
-                  <TrendingUp className="h-4.5 w-4.5 mr-1.5 text-green-600" />
-                  EXPECTED YIELD & HARVEST PREDICTION
+                <h3 className={`text-sm font-extrabold uppercase tracking-wider flex items-center ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                  <LineChart className="h-4 w-4 text-emerald-500 mr-2" />
+                  {t('mandi_price_trend_forecast')} - {localizedTopCrop} ({location})
+                </h3>
+                <span className="text-[10px] bg-emerald-700 text-white font-extrabold px-3 py-1 rounded-full shadow-2xs">
+                  {t('forecast_badge')}
                 </span>
-                <span className="text-[10px] bg-green-100 text-green-800 font-bold px-2.5 py-0.5 rounded-full">Yield Estimation</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-100">
-                  <span className="block text-xs font-bold text-gray-500 uppercase">Estimated Yield Rate</span>
-                  <span className="text-2xl font-black text-emerald-800">
-                    {analysisData.yield_prediction?.predicted_yield_tonnes_per_ha?.toFixed(2) || '3.65'}
-                  </span>
-                  <span className="block text-xs font-bold text-emerald-600">Tonnes / Hectare</span>
+              {/* RICH DARK EMERALD GREEN BOXES */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div className="p-3.5 rounded-2xl border bg-slate-900 text-slate-100 border-slate-700 shadow-md">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('today_mandi_price')}</span>
+                  <span className="text-lg font-black text-white">₹{priceForecast.priceToday.toLocaleString('en-IN')}</span>
+                  <span className="block text-[9px] text-slate-400 font-extrabold mt-0.5">Base Rate</span>
                 </div>
-                <div className="bg-emerald-100/80 p-3.5 rounded-xl border border-emerald-300">
-                  <span className="block text-xs font-bold text-gray-600 uppercase">Expected Total Harvest</span>
-                  <span className="text-2xl font-black text-green-900">
-                    {analysisData.yield_prediction?.predicted_total_production_tonnes?.toFixed(2) || '9.13'}
-                  </span>
-                  <span className="block text-xs font-extrabold text-green-700">Total Tonnes ({areaHa} ha)</span>
+                <div className="p-3.5 rounded-2xl border bg-emerald-900/90 text-emerald-100 border-emerald-700 shadow-md">
+                  <span className="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider">{t('15_day_forecast')}</span>
+                  <span className="text-lg font-black text-white">₹{priceForecast.price15.toLocaleString('en-IN')}</span>
+                  <span className="block text-[9px] text-emerald-300 font-extrabold mt-0.5">+3.8% Gain</span>
+                </div>
+                <div className="p-3.5 rounded-2xl border bg-emerald-800 text-white border-emerald-600 shadow-lg ring-1 ring-emerald-500/40">
+                  <span className="block text-[10px] font-bold text-emerald-200 uppercase tracking-wider">{t('30_day_forecast')}</span>
+                  <span className="text-lg font-black text-white">₹{priceForecast.price30.toLocaleString('en-IN')}</span>
+                  <span className="block text-[9px] text-amber-300 font-extrabold mt-0.5">+7.5% Gain</span>
+                </div>
+                <div className="p-3.5 rounded-2xl border bg-teal-900/90 text-teal-100 border-teal-700 shadow-md">
+                  <span className="block text-[10px] font-bold text-teal-300 uppercase tracking-wider">{t('90_day_forecast')}</span>
+                  <span className="text-lg font-black text-white">₹{priceForecast.price90.toLocaleString('en-IN')}</span>
+                  <span className="block text-[9px] text-teal-300 font-extrabold mt-0.5">+13.4% Peak</span>
                 </div>
               </div>
+
+              {/* VISUAL MANDI PRICE TREND GRAPH */}
+              <MandiPriceChart prices={priceForecast} cropName={localizedTopCrop} isDarkMode={isDarkMode} />
             </div>
 
-            {/* MARKET PRICE FORECASTS & MARKET TREND CURVE (NEXT 15, 30, 90 DAYS) */}
-            <div className="bg-amber-50/90 border border-amber-300 rounded-2xl p-4.5 shadow-xs space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-extrabold text-amber-950 flex items-center">
-                  <LineChart className="h-5 w-5 mr-2 text-amber-700" />
-                  EXPECTED MARKET PRICE & TREND CURVE (NEXT 15, 30, 90 DAYS)
-                </span>
-                <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2.5 py-0.5 rounded-full flex items-center">
-                  📈 Price Projection
-                </span>
-              </div>
+            {/* PROFITABILITY BREAKDOWN */}
+            <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+              <h3 className="text-sm font-extrabold text-gray-800 uppercase tracking-wider mb-3 flex items-center">
+                <DollarSign className="h-4 w-4 text-emerald-600 mr-2" />
+                {t('estimated_financial_returns_breakdown')} ({areaHa} Ha Land)
+              </h3>
 
-              {/* 15, 30, 90 Days Price Cards Grid */}
-              <div className="grid grid-cols-4 gap-3 text-center">
-                <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs">
-                  <span className="block text-[10px] font-bold text-gray-500 uppercase">Today</span>
-                  <span className="text-base font-extrabold text-amber-900">₹{priceForecast.priceToday.toLocaleString('en-IN')}</span>
-                  <span className="block text-[9px] font-bold text-gray-400">/ Quintal</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-xs font-semibold">
+                <div className={`p-3 rounded-xl border flex justify-between ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-50 border-gray-200'}`}>
+                  <span>{t('total_cultivation_cost')}:</span>
+                  <span className="font-bold text-gray-700">₹{(75000 * areaHa).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="bg-amber-100/60 p-3 rounded-xl border border-amber-300 shadow-xs">
-                  <span className="block text-[10px] font-bold text-amber-800 uppercase">Next 15 Days</span>
-                  <span className="text-base font-extrabold text-amber-900">₹{priceForecast.price15.toLocaleString('en-IN')}</span>
-                  <span className="block text-[9px] font-bold text-green-700">+3.8%</span>
-                </div>
-                <div className="bg-amber-200/60 p-3 rounded-xl border border-amber-400 shadow-xs">
-                  <span className="block text-[10px] font-bold text-amber-900 uppercase">Next 30 Days</span>
-                  <span className="text-base font-extrabold text-amber-950">₹{priceForecast.price30.toLocaleString('en-IN')}</span>
-                  <span className="block text-[9px] font-bold text-green-700">+7.5%</span>
-                </div>
-                <div className="bg-amber-300/40 p-3 rounded-xl border border-amber-500 shadow-xs">
-                  <span className="block text-[10px] font-bold text-amber-950 uppercase">Next 90 Days</span>
-                  <span className="text-base font-black text-amber-950">₹{priceForecast.price90.toLocaleString('en-IN')}</span>
-                  <span className="block text-[9px] font-bold text-green-700">+13.4%</span>
-                </div>
-              </div>
-
-              {/* Interactive SVG Market Trend Line Curve Chart */}
-              <div className="bg-white p-4 rounded-xl border border-amber-200">
-                <div className="flex justify-between items-center text-xs font-bold text-amber-900 mb-1">
-                  <span>Market Price Curve ({analysisData.crop_recommendation?.recommended_crop || selectedCrop})</span>
-                  <span className="text-[10px] text-gray-500">90-Day Outlook</span>
-                </div>
-                <div className="h-28 w-full relative pt-2">
-                  <svg className="w-full h-full overflow-visible" viewBox="0 0 300 70">
-                    <defs>
-                      <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-
-                    <polygon 
-                      points="20,60 20,48 100,38 180,26 260,10 260,60" 
-                      fill="url(#priceGradient)" 
-                    />
-
-                    <polyline 
-                      fill="none" 
-                      stroke="#d97706" 
-                      strokeWidth="3" 
-                      strokeLinecap="round"
-                      points="20,48 100,38 180,26 260,10" 
-                    />
-
-                    <circle cx="20" cy="48" r="4" fill="#d97706" />
-                    <text x="20" y="65" fontSize="8" fontWeight="bold" fill="#78350f" textAnchor="middle">Today</text>
-                    <text x="20" y="42" fontSize="8" fontWeight="extrabold" fill="#92400e" textAnchor="middle">₹{priceForecast.priceToday}</text>
-
-                    <circle cx="100" cy="38" r="4" fill="#d97706" />
-                    <text x="100" y="65" fontSize="8" fontWeight="bold" fill="#78350f" textAnchor="middle">+15 Days</text>
-                    <text x="100" y="32" fontSize="8" fontWeight="extrabold" fill="#92400e" textAnchor="middle">₹{priceForecast.price15}</text>
-
-                    <circle cx="180" cy="26" r="4" fill="#d97706" />
-                    <text x="180" y="65" fontSize="8" fontWeight="bold" fill="#78350f" textAnchor="middle">+30 Days</text>
-                    <text x="180" y="20" fontSize="8" fontWeight="extrabold" fill="#92400e" textAnchor="middle">₹{priceForecast.price30}</text>
-
-                    <circle cx="260" cy="10" r="5" fill="#b45309" />
-                    <text x="260" y="65" fontSize="8" fontWeight="bold" fill="#78350f" textAnchor="middle">+90 Days</text>
-                    <text x="260" y="4" fontSize="8" fontWeight="black" fill="#b45309" textAnchor="middle">₹{priceForecast.price90}</text>
-                  </svg>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center text-xs font-extrabold text-amber-900 pt-1 border-t border-amber-200/60">
-                <span>Estimated Total Gross Revenue ({areaHa} ha):</span>
-                <span className="text-lg font-black text-amber-800">
-                  ₹{((analysisData.yield_prediction?.predicted_total_production_tonnes || 9.13) * 10 * (analysisData.market_price_summary?.mandi_price_per_quintal || 2300)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-
-            {/* CULTIVATION COST & NET PROFIT ESTIMATE */}
-            <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4.5 shadow-sm">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-black text-emerald-950 flex items-center">
-                  <DollarSign className="h-4 w-4 mr-1 text-emerald-600" />
-                  CULTIVATION COST & NET PROFIT ESTIMATE
-                </span>
-                <span className="text-[10px] bg-emerald-700 text-white font-black px-2.5 py-0.5 rounded-full">Profit Summary</span>
-              </div>
-              
-              <div className="space-y-1.5 text-xs text-gray-700 font-semibold mb-3">
-                <div className="flex justify-between">
-                  <span>Est. Cultivation Cost (₹{(analysisData.profit_analysis?.cost_per_ha_inr || 75000).toLocaleString('en-IN')}/ha):</span>
-                  <span className="font-bold text-gray-900">{analysisData.profit_analysis?.formatted_cost || `₹${(75000 * areaHa).toLocaleString('en-IN')}`}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Gross Revenue:</span>
+                <div className={`p-3 rounded-xl border flex justify-between ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-50 border-gray-200'}`}>
+                  <span>{t('total_gross_revenue')}:</span>
                   <span className="font-bold text-gray-900">{analysisData.profit_analysis?.formatted_revenue || `₹${(3.65 * areaHa * 23000).toLocaleString('en-IN')}`}</span>
                 </div>
               </div>
 
-              <div className="bg-white p-3.5 rounded-xl border border-emerald-300 flex justify-between items-center">
+              <div className={`p-3.5 rounded-xl border flex justify-between items-center ${isDarkMode ? 'bg-slate-900 border-emerald-500/40' : 'bg-white border-emerald-300'}`}>
                 <div>
-                  <span className="block text-[10px] font-bold text-gray-500 uppercase">Expected Net Profit</span>
-                  <span className="text-2xl font-black text-emerald-700">
+                  <span className="block text-[10px] font-bold text-gray-500 uppercase">{t('expected_net_profit')}</span>
+                  <span className="text-2xl font-black text-emerald-600">
                     {analysisData.profit_analysis?.formatted_profit || `₹${((3.65 * areaHa * 23000) - (75000 * areaHa)).toLocaleString('en-IN')}`}
                   </span>
                 </div>
                 <span className="bg-emerald-700 text-white font-black text-sm px-4 py-1.5 rounded-full shadow-xs">
-                  +{analysisData.profit_analysis?.roi_percent || 19.1}% ROI
+                  +{analysisData.profit_analysis?.roi_percent || 19.1}% {t('roi')}
                 </span>
               </div>
             </div>
@@ -647,24 +852,28 @@ const FarmerDashboard = () => {
 
       {/* Floating Action Button Stack (Bottom Right Corner) */}
       <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
-        {/* Listen to Voice Audio Advisory Button (Directly Above Smart Assistant) */}
+        {/* Listen to Voice Audio Advisory Button */}
         <button 
           onClick={handleReadAdvisory}
-          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4.5 py-3 rounded-full shadow-xl hover:scale-105 active:scale-95 transition-all border border-blue-400 text-xs font-extrabold"
-          title="Listen to Voice Audio Advisory"
+          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-full shadow-xl hover:scale-105 active:scale-95 transition-all border border-blue-400 text-xs font-extrabold"
+          title={t('listen_to_advisory')}
         >
-          <Volume2 className={`h-5 w-5 ${playing ? 'animate-pulse text-yellow-300' : 'text-white'}`} />
-          <span>{playing ? 'Stop Audio' : 'Listen to Advisory'}</span>
+          <Volume2 className={`h-4.5 w-4.5 ${playing ? 'animate-pulse text-yellow-300' : 'text-white'}`} />
+          <span>{playing ? t('stop_audio') : t('listen_to_advisory')}</span>
         </button>
 
-        {/* Smart Assistant Floating Trigger Button */}
+        {/* Standard-Sized Button Bar with Popping-Out 3X Bot Logo Avatar */}
         <button
           onClick={() => setIsAssistantOpen(true)}
-          className="flex items-center space-x-2.5 bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-700 text-white px-5 py-3.5 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all border border-emerald-400"
-          title="Open Smart Assistant Chat"
+          className="relative flex items-center space-x-2.5 bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-700 text-white pl-2 pr-5 py-2.5 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all border border-emerald-400 overflow-visible"
+          title={t('smart_assistant')}
         >
-          <Bot className="h-6 w-6 text-amber-300 animate-pulse" />
-          <span className="font-black text-sm tracking-wide">Smart Assistant</span>
+          <img 
+            src={smartBotImg} 
+            alt="Smart AI Bot" 
+            className="w-16 h-16 sm:w-18 sm:h-18 object-contain drop-shadow-xl shrink-0 -my-4 -ml-2 transition-transform hover:scale-110" 
+          />
+          <span className="font-black text-sm sm:text-base tracking-wide">{t('smart_assistant')}</span>
         </button>
       </div>
 
@@ -675,18 +884,22 @@ const FarmerDashboard = () => {
             
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-emerald-200/60 bg-emerald-700 text-white shadow-xs">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
-                  <Bot className="h-6 w-6 text-amber-300 animate-bounce" />
+              <div className="flex items-center space-x-4">
+                <div className="p-1 bg-white/20 rounded-2xl backdrop-blur-md">
+                  <img 
+                    src={smartBotImg} 
+                    alt="Smart AI Bot Avatar" 
+                    className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-md" 
+                  />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base sm:text-lg flex items-center gap-2">
-                    Smart AI Farm Assistant
-                    <span className="text-[10px] bg-amber-400/30 text-amber-200 px-2 py-0.5 rounded-full font-bold border border-amber-300/40">
-                      Local Qwen 14B ML
+                  <h3 className="font-extrabold text-lg sm:text-xl flex items-center gap-2">
+                    {t('chat_title')}
+                    <span className="text-[10px] bg-emerald-400/30 text-emerald-100 px-2.5 py-0.5 rounded-full font-bold border border-emerald-300/40">
+                      Official Advisory
                     </span>
                   </h3>
-                  <p className="text-xs text-emerald-100">Ask any questions about soil, crops, weather, mandi prices, or loans</p>
+                  <p className="text-xs text-emerald-100">{t('chat_subtitle')}</p>
                 </div>
               </div>
 

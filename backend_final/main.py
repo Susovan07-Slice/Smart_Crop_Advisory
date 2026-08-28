@@ -6,15 +6,20 @@ from fastapi.responses import FileResponse
 
 import models
 import database
+
+import models_login
+import database_login
+
 from routers import ml, weather, chat, auth, farmers, loan
 
-# Initialize SQLite DB
+# Initialize Main SQLite DB & Login Details SQLite DB (login_details.db)
 models.Base.metadata.create_all(bind=database.engine)
+models_login.LoginBase.metadata.create_all(bind=database_login.login_engine)
 
 app = FastAPI(
     title="SmartCrop Unified AI Agriculture API",
-    description="Unified Master Backend Combining ML Cascading Pipeline, Loan Financial Distress ML Model, OTP Auth, Farmer Records DB, Weather & Chat Assistant",
-    version="2.1.0"
+    description="Unified Master Backend Combining ML Cascading Pipeline, Loan Financial Distress ML Model, 4-Digit PIN Auth with SQLite login_details.db, Weather & Chat Assistant",
+    version="2.2.0"
 )
 
 # CORS configuration
@@ -29,16 +34,22 @@ app.add_middleware(
 # Include API routers (prefixed with /api)
 app.include_router(ml.router, prefix="/api", tags=["Machine Learning & Cascading Pipeline"])
 app.include_router(loan.router, prefix="/api", tags=["Loan Financial Distress"])
-app.include_router(auth.router, prefix="/api", tags=["OTP Authentication & Login"])
+app.include_router(auth.router, prefix="/api", tags=["4-Digit PIN & Registration Auth"])
 app.include_router(farmers.router, prefix="/api", tags=["Farmer Records & Officer Dashboard"])
 app.include_router(weather.router, prefix="/api", tags=["Weather & Soil Profiles"])
 app.include_router(chat.router, prefix="/api", tags=["Chatbot Assistant"])
 
-# Path to the React static frontend directory
-frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
+# Path to the React static frontend directory (targets dist build)
+base_dir = os.path.dirname(os.path.dirname(__file__))
+frontend_dist = os.path.abspath(os.path.join(base_dir, "SmartCrop-main", "SmartCrop-main", "frontend", "dist"))
 
-if os.path.exists(frontend_dir):
-    assets_dir = os.path.join(frontend_dir, "assets")
+if not os.path.exists(frontend_dist):
+    frontend_dist = os.path.abspath(os.path.join(base_dir, "frontend", "dist"))
+if not os.path.exists(frontend_dist):
+    frontend_dist = os.path.abspath(os.path.join(base_dir, "frontend"))
+
+if os.path.exists(frontend_dist):
+    assets_dir = os.path.join(frontend_dist, "assets")
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
@@ -47,10 +58,10 @@ if os.path.exists(frontend_dir):
         if full_path.startswith("api"):
             return None
         
-        file_path = os.path.join(frontend_dir, full_path)
+        file_path = os.path.join(frontend_dist, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
-        return FileResponse(os.path.join(frontend_dir, "index.html"))
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
 else:
     @app.get("/")
     def read_root():

@@ -1,21 +1,37 @@
 from pydantic import BaseModel
 from typing import Optional
 
-class OTPRequest(BaseModel):
+class PhoneCheckRequest(BaseModel):
     phone: str
-    role: Optional[str] = "farmer"  # "farmer" or "officer"
 
-class OTPVerify(BaseModel):
-    phone: str
-    otp: str
-    role: Optional[str] = "farmer"  # "farmer" or "officer"
-
-class OTPResponse(BaseModel):
+class PhoneCheckResponse(BaseModel):
     status: str
+    exists: bool
+    phone: str
     message: str
-    expires_in: int = 300
-    resend_cooldown: int = 30
-    test_otp: Optional[str] = None
+
+class FarmerProfileSchema(BaseModel):
+    phone: str
+    first_name: Optional[str] = ""
+    last_name: Optional[str] = ""
+    district: Optional[str] = "Cuttack"
+    dob: Optional[str] = ""
+    land_area_ha: Optional[float] = 2.5
+
+class PinRegisterRequest(BaseModel):
+    phone: str
+    pin: str
+    first_name: Optional[str] = ""
+    last_name: Optional[str] = ""
+    district: Optional[str] = "Cuttack"
+    dob: Optional[str] = ""
+    land_area_ha: Optional[float] = 2.5
+    role: Optional[str] = "farmer"
+
+class PinLoginRequest(BaseModel):
+    phone: str
+    pin: str
+    role: Optional[str] = "farmer"
 
 class AuthTokenResponse(BaseModel):
     status: str
@@ -23,6 +39,23 @@ class AuthTokenResponse(BaseModel):
     role: str
     phone: Optional[str] = None
     message: Optional[str] = None
+    profile: Optional[FarmerProfileSchema] = None
+
+class OTPRequest(BaseModel):
+    phone: str
+    role: Optional[str] = "farmer"
+
+class OTPVerify(BaseModel):
+    phone: str
+    otp: str
+    role: Optional[str] = "farmer"
+
+class OTPResponse(BaseModel):
+    status: str
+    message: str
+    expires_in: int = 300
+    resend_cooldown: int = 30
+    test_otp: Optional[str] = None
 
 class OfficerLogin(BaseModel):
     username: str

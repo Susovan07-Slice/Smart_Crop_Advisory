@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
+import { X, CreditCard } from 'lucide-react';
 
 const LoanInformationModal = ({ isOpen, onClose, onSave, initialData }) => {
+  const { t } = useLanguage();
   const [hasLoan, setHasLoan] = useState(false);
   const [originalLoanAmount, setOriginalLoanAmount] = useState(100000);
   const [outstandingPrincipal, setOutstandingPrincipal] = useState(80000);
@@ -45,64 +48,80 @@ const LoanInformationModal = ({ isOpen, onClose, onSave, initialData }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-emerald-700/50 rounded-2xl p-6 max-w-lg w-full shadow-2xl text-slate-100 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-          <h3 className="text-lg font-bold text-emerald-400">Farmer Financial & Loan Profile</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl">✕</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      {/* Light Mode Crystal Frosted Glassy Modal Card */}
+      <div className="bg-white/95 backdrop-blur-2xl border border-white/80 rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl text-gray-900 max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-emerald-200/80 pb-3.5 mb-4">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 bg-emerald-100 rounded-xl text-emerald-700">
+              <CreditCard className="h-5 w-5" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-black text-emerald-950 tracking-tight">
+              {t('farmer_financial_loan_profile')}
+            </h3>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="text-gray-400 hover:text-gray-700 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+            title="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-slate-300 mb-2">
-              Does the farmer currently have any active loan?
+            <label className="block text-xs font-bold text-gray-700 uppercase mb-2">
+              {t('loan_active_question')}
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setHasLoan(true)}
-                className={`py-2 px-4 rounded-xl border text-sm font-medium transition-all ${
+                className={`py-2.5 px-4 rounded-xl border text-xs font-extrabold transition-all ${
                   hasLoan
-                    ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg'
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                    ? 'bg-emerald-600 border-emerald-500 text-white shadow-md'
+                    : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                Yes, Active Loan
+                {t('yes_active_loan')}
               </button>
               <button
                 type="button"
                 onClick={() => setHasLoan(false)}
-                className={`py-2 px-4 rounded-xl border text-sm font-medium transition-all ${
+                className={`py-2.5 px-4 rounded-xl border text-xs font-extrabold transition-all ${
                   !hasLoan
-                    ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg'
-                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                    ? 'bg-emerald-600 border-emerald-500 text-white shadow-md'
+                    : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                No Loans
+                {t('no_loans')}
               </button>
             </div>
           </div>
 
           {hasLoan && (
-            <div className="space-y-3 border-t border-slate-800 pt-3">
+            <div className="space-y-3.5 border-t border-emerald-100 pt-3.5">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Original Loan Amount (₹)</label>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">{t('original_loan_amount')}</label>
                   <input
                     type="number"
                     value={originalLoanAmount}
                     onChange={(e) => setOriginalLoanAmount(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white/90 border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none shadow-2xs"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Outstanding Principal (₹)</label>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">{t('outstanding_principal')}</label>
                   <input
                     type="number"
                     value={outstandingPrincipal}
                     onChange={(e) => setOutstandingPrincipal(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white/90 border border-red-300 rounded-xl px-3.5 py-2.5 text-xs font-black text-red-600 focus:ring-2 focus:ring-red-500 outline-none shadow-2xs"
                     required
                   />
                 </div>
@@ -110,23 +129,23 @@ const LoanInformationModal = ({ isOpen, onClose, onSave, initialData }) => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Annual Interest Rate (%)</label>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">{t('annual_interest_rate')}</label>
                   <input
                     type="number"
                     step="0.1"
                     value={annualInterestRate}
                     onChange={(e) => setAnnualInterestRate(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white/90 border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none shadow-2xs"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Total Amount Repaid (₹)</label>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">{t('total_amount_repaid')}</label>
                   <input
                     type="number"
                     value={totalAmountRepaid}
                     onChange={(e) => setTotalAmountRepaid(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white/90 border border-emerald-300 rounded-xl px-3.5 py-2.5 text-xs font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500 outline-none shadow-2xs"
                     required
                   />
                 </div>
@@ -134,59 +153,59 @@ const LoanInformationModal = ({ isOpen, onClose, onSave, initialData }) => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Recent New Loan Taken (₹)</label>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">{t('recent_new_loan')}</label>
                   <input
                     type="number"
                     value={newLoanAmount}
                     onChange={(e) => setNewLoanAmount(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white/90 border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Repayment Frequency</label>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">{t('repayment_frequency')}</label>
                   <select
                     value={repaymentFrequency}
                     onChange={(e) => setRepaymentFrequency(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-white/90 border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none shadow-2xs"
                   >
-                    <option value="Monthly">Monthly</option>
-                    <option value="Quarterly">Quarterly</option>
-                    <option value="Half-yearly">Half-yearly</option>
-                    <option value="Yearly">Yearly</option>
+                    <option value="Yearly">{t('yearly')}</option>
+                    <option value="Half-yearly">{t('half_yearly')}</option>
+                    <option value="Quarterly">{t('quarterly')}</option>
+                    <option value="Monthly">{t('monthly')}</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Lender / Financial Source</label>
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">{t('lender_source')}</label>
                 <select
                   value={lenderSource}
                   onChange={(e) => setLenderSource(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white/90 border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none shadow-2xs"
                 >
-                  <option value="Bank">Bank (Public / Commercial)</option>
-                  <option value="Cooperative">Cooperative Society</option>
-                  <option value="Government scheme">Government Scheme / KCC</option>
-                  <option value="Microfinance">Microfinance Institution</option>
-                  <option value="Other">Other / Local Lender</option>
+                  <option value="Bank">{t('bank')}</option>
+                  <option value="Cooperative">{t('cooperative')}</option>
+                  <option value="Government scheme">{t('govt_scheme')}</option>
+                  <option value="Microfinance">{t('microfinance')}</option>
+                  <option value="Other">{t('other_lender')}</option>
                 </select>
               </div>
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-3.5 border-t border-emerald-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-slate-400 hover:text-white"
+              className="px-4 py-2.5 text-xs font-bold text-gray-600 hover:text-gray-900 transition-colors"
             >
-              Cancel
+              {t('cancel')}
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-lg transition-all"
+              className="px-5 py-2.5 text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md active:scale-95 transition-all"
             >
-              Save Profile & Update Safety Score
+              {t('save_profile_update_score')}
             </button>
           </div>
         </form>
