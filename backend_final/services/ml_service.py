@@ -1,0 +1,261 @@
+from typing import Dict, Any, Optional, List
+from schemas.ml import (
+    CropRecommendationRequest, CropRecommendationResponse,
+    ProductionPredictionRequest, ProductionPredictionResponse
+)
+from schemas.loan import LoanProfileInput, CandidateCropScoreItem, LoanDistressBreakdown
+from services.crop_recommendation_service import recommend_crop as run_crop_recommendation
+from services.yield_prediction_service import predict_yield_and_production
+from services.profit_calculator_service import calculate_cost_revenue_profit
+from services.loan_distress_service import calculate_loan_distress
+from services.weather_service import get_weather_for_district
+import core.config as config
+
+def recommend_crop(data: CropRecommendationRequest) -> CropRecommendationResponse:
+    result = run_crop_recommendation(
+        N=data.N,
+        P=data.P,
+        K=data.K,
+        ph=data.ph,
+        district=data.district,
+        latitude=data.latitude,
+        longitude=data.longitude,
+        rainfall=data.rainfall,
+        temperature=data.temperature,
+        humidity=data.humidity,
+        season=data.season,
+        top_k=data.top_k or 5
+    )
+    
+    return CropRecommendationResponse(
+        recommended_crop=result['recommended_crop'],
+        confidence=result['confidence'],
+        top_recommendations=result['top_recommendations'],
+        input_summary=result['input_summary']
+    )
+
+def predict_production(data: ProductionPredictionRequest) -> ProductionPredictionResponse:
+    res = predict_yield_and_production(
+        crop=data.crop,
+        district=data.district,
+        area_ha=data.area,
+        season=data.season or 'Kharif',
+        rainfall_mm=data.rainfall or 1100.0
+    )
+    return ProductionPredictionResponse(
+        expected_production_tonnes=res['predicted_total_production_tonnes']
+    )
+
+def run_loan_aware_farm_analysis(
+    district: str = "Cuttack",
+    season: str = "Kharif",
+    area_ha: float = 2.5,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    loan_input: Optional[LoanProfileInput] = None
+) -> Dict[str, Any]:
+    if loan_input is None:
+        loan_input = LoanProfileInput(has_loan=False)
+
+    weather_data = get_weather_for_district(district)
+    temp = weather_data.get("temperature", 27.5)
+    hum = weather_data.get("humidity", 76.0)
+    rain = weather_data.get("rainfall_mm", 1150.0)
+
+    rec_req = CropRecommendationRequest(
+        district=district,
+        season=season,
+        latitude=latitude,
+        longitude=longitude,
+        N=56.6, P=31.7, K=42.8, ph=6.39,
+        temperature=temp, humidity=hum, rainfall=rain,
+        top_k=5
+    )
+    rec_res = recommend_crop(rec_req)
+    top_candidates_raw = rec_res.top_recommendations[:5]
+
+    evaluated_candidates = []
+    max_expected_profit = 0.0
+
+    for cand in top_candidates_raw:
+        c_name = cand.crop
+        suitability_prob = cand.probability
+        suitability_score = round(suitability_prob * 100.0, 1)
+
+        y_res = predict_yield_and_production(
+            crop=c_name,
+            district=district,
+            area_ha=area_ha,
+            season=season,
+            rainfall_mm=rain
+        )
+        yield_rate = y_res['predicted_yield_tonnes_per_ha']
+        total_prod = y_res['predicted_total_production_tonnes']
+
+        prof_res = calculate_cost_revenue_profit(
+            crop=c_name,
+            district=district,
+            area_ha=area_ha,
+            production_tonnes=total_prod,
+            mandi_price_per_quintal=None
+        )
+
+        cost_per_ha = prof_res['cost_per_ha_inr']
+        total_cost = prof_res['total_cost_inr']
+        mandi_p_q = prof_res['mandi_price_per_quintal']
+        total_rev = prof_res['total_revenue_inr']
+        net_prof = prof_res['net_profit_inr']
+
+        if net_prof > max_expected_profit:
+            max_expected_profit = net_prof
+
+        evaluated_candidates.append({
+            'crop': c_name,
+            'suitability_score': suitability_score,
+            'yield_rate': yield_rate,
+            'total_prod': total_prod,
+            'mandi_price_q': mandi_p_q,
+            'total_rev': total_rev,
+            'cost_per_ha': cost_per_ha,
+            'total_cost': total_cost,
+            'net_prof': net_prof
+        })
+
+    base_profit = max(50000.0, max_expected_profit)
+    loan_breakdown: LoanDistressBreakdown = calculate_loan_distress(loan_input, expected_annual_profit=base_profit)
+    loan_distress_score = loan_breakdown.loan_distress_score
+
+    profits = [item['net_prof'] for item in evaluated_candidates]
+    min_prof = min(profits)
+    max_prof = max(profits)
+    prof_range = max_prof - min_prof if max_prof > min_prof else 1.0
+
+    scored_candidates: List[CandidateCropScoreItem] = []
+
+    for item in evaluated_candidates:
+        c_name = item['crop']
+        s_score = item['suitability_score']
+        net_p = item['net_prof']
+
+        profit_score = round(100.0 * (net_p - min_prof) / prof_range, 1) if max_prof > min_prof else 75.0
+
+        margin = (net_p / item['total_rev']) if item['total_rev'] > 0 else 0.0
+        profit_risk = max(0.0, min(100.0, 100.0 * (1.0 - max(0.0, margin))))
+        climate_risk = 25.0
+        cost_risk = min(100.0, max(0.0, (item['cost_per_ha'] / 1000.0)))
+        market_risk = 20.0
+
+        crop_distress_comp = round(
+            config.WEIGHT_PROFIT_RISK * profit_risk +
+            config.WEIGHT_CLIMATE_RISK * climate_risk +
+            config.WEIGHT_COST_RISK * cost_risk +
+            config.WEIGHT_MARKET_RISK * market_risk,
+            1
+        )
+
+        final_distress = round(
+            config.WEIGHT_CROP_DISTRESS * crop_distress_comp +
+            config.WEIGHT_LOAN_DISTRESS * loan_distress_score,
+            1
+        )
+
+        safety_score = round(max(0.0, min(100.0, 100.0 - final_distress)), 1)
+
+        final_crop_score = round(
+            config.WEIGHT_SUITABILITY_SCORE * s_score +
+            config.WEIGHT_PROFIT_SCORE * profit_score +
+            config.WEIGHT_SAFETY_SCORE * safety_score,
+            1
+        )
+
+        reason = f"Excellent agronomic suitability ({s_score}/100) with expected net profit of ₹{net_p:,.0f} and safety score of {safety_score}/100."
+        if loan_distress_score > 60:
+            reason += f" (Adjusted for high farmer loan burden score: {loan_distress_score}/100)."
+
+        scored_candidates.append(CandidateCropScoreItem(
+            rank=0,
+            crop=c_name,
+            suitability_score=s_score,
+            predicted_yield_tonnes_per_ha=round(item['yield_rate'], 2),
+            predicted_total_production_tonnes=round(item['total_prod'], 2),
+            mandi_price_per_quintal=round(item['mandi_price_q'], 2),
+            expected_gross_revenue=round(item['total_rev'], 2),
+            cultivation_cost_per_ha=round(item['cost_per_ha'], 2),
+            total_cultivation_cost=round(item['total_cost'], 2),
+            expected_net_profit=round(net_p, 2),
+            profit_score=profit_score,
+            crop_distress_component=crop_distress_comp,
+            loan_distress_score=loan_distress_score,
+            final_distress_score=final_distress,
+            safety_score=safety_score,
+            final_crop_score=final_crop_score,
+            recommendation_reason=reason
+        ))
+
+    scored_candidates.sort(key=lambda x: x.final_crop_score, reverse=True)
+
+    for idx, cand in enumerate(scored_candidates):
+        cand.rank = idx + 1
+
+    top_3_candidates = scored_candidates[:3]
+    master_recommended_crop = top_3_candidates[0].crop
+
+    top_cand = top_3_candidates[0]
+    legacy_yield = {
+        "crop": top_cand.crop,
+        "district": district,
+        "area_ha": area_ha,
+        "season": season,
+        "predicted_yield_tonnes_per_ha": top_cand.predicted_yield_tonnes_per_ha,
+        "predicted_total_production_tonnes": top_cand.predicted_total_production_tonnes,
+        "model_used": "Random Forest Regressor",
+        "status": "Success"
+    }
+
+    legacy_market = {
+        "crop": top_cand.crop,
+        "district": district,
+        "mandi_price_per_quintal": top_cand.mandi_price_per_quintal,
+        "mandi_price_per_tonne": top_cand.mandi_price_per_quintal * 10.0,
+        "price_date": "2023-10-25"
+    }
+
+    legacy_profit = {
+        "crop": top_cand.crop,
+        "district": district,
+        "area_ha": area_ha,
+        "cost_per_ha_inr": top_cand.cultivation_cost_per_ha,
+        "total_cost_inr": top_cand.total_cultivation_cost,
+        "mandi_price_per_quintal": top_cand.mandi_price_per_quintal,
+        "mandi_price_per_tonne": top_cand.mandi_price_per_quintal * 10.0,
+        "total_revenue_inr": top_cand.expected_gross_revenue,
+        "net_profit_inr": top_cand.expected_net_profit,
+        "roi_percent": round((top_cand.expected_net_profit / max(1.0, top_cand.total_cultivation_cost)) * 100, 2),
+        "formatted_cost": f"₹{top_cand.total_cultivation_cost:,.2f}",
+        "formatted_revenue": f"₹{top_cand.expected_gross_revenue:,.2f}",
+        "formatted_profit": f"₹{top_cand.expected_net_profit:,.2f}",
+        "status": "Profitable"
+    }
+
+    return {
+        "location_summary": {
+            "district": district,
+            "season": season,
+            "area_ha": area_ha,
+            "weather_source": weather_data.get("condition", "Partly Cloudy")
+        },
+        "crop_recommendation": {
+            "recommended_crop": master_recommended_crop,
+            "confidence": round(top_cand.suitability_score / 100.0, 4),
+            "top_recommendations": [
+                {"crop": c.crop, "probability": c.suitability_score / 100.0, "confidence_percentage": f"{c.suitability_score}%"}
+                for c in top_3_candidates
+            ],
+            "input_summary": rec_res.input_summary
+        },
+        "yield_prediction": legacy_yield,
+        "market_price_summary": legacy_market,
+        "profit_analysis": legacy_profit,
+        "farmer_financial": loan_breakdown.model_dump(),
+        "candidates": [c.model_dump() for c in top_3_candidates]
+    }

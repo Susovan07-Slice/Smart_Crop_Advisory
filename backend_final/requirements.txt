@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+requests
+python-dotenv
+openai
+scikit-learn
+xgboost
+pandas
+numpy
+pydantic-settings
