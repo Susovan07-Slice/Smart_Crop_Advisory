@@ -2,18 +2,18 @@ export const translations = {
   en: {
     welcome: "Welcome to SmartCrop",
     subtitle: "Intelligent agricultural advisory and monitoring system. Please select your role to continue.",
-    farmer_title: "I am a Farmer",
+    farmer_title: "I am a FARMER",
     farmer_desc: "Access intelligent crop advice, check market prices, and get weather alerts through our voice assistant.",
     farmer_btn: "Login via OTP",
-    officer_title: "I am an Officer",
+    officer_title: "I am an OFFICER",
     officer_desc: "Monitor regional agricultural data, identify high-risk farmers, and send automated distress alerts.",
     officer_btn: "Login via Portal",
     home: "Home",
-    language: "Language",
+    language: "LANGUAGE",
     nav_brand: "SmartCrop",
     nav_farmer: "Farmer",
     nav_portal: "Officer Portal",
-    
+
     // Farmer Login Page
     farmer_login_title: "Farmer Login",
     enter_mobile: "Enter your mobile number to get started",
@@ -27,7 +27,7 @@ export const translations = {
     resend_in: "Resend in",
     seconds_abbr: "s",
     otp_sent_success: "OTP code has been sent to your mobile via SMS.",
-    
+
     // Farmer Chat Page
     chat_title: "SmartCrop Assistant",
     chat_subtitle: "Ask me about weather, prices, or crop issues!",
@@ -38,7 +38,7 @@ export const translations = {
     chat_placeholder: "Type your message or tap the mic...",
     listening_text: "Listening... Speak now.",
     chat_error: "Sorry, I'm having trouble connecting right now. Please try again.",
-    
+
     // Officer Login Page
     officer_portal_title: "Officer Portal",
     officer_sign_in: "Sign in to access the regional monitoring dashboard",
@@ -49,7 +49,7 @@ export const translations = {
     password_placeholder: "Password (123)",
     access_dashboard: "Access Dashboard",
     back_to_roles: "Back to Role Selection",
-    
+
     // Officer Dashboard
     dashboard_title: "SmartCrop Dashboard",
     total_farmers: "Total Farmers",
@@ -64,7 +64,7 @@ export const translations = {
     fetch_error: "Failed to fetch dashboard data. Make sure backend is running.",
     alert_sent: "Alert sent successfully!",
     alert_failed: "Failed to send alert.",
-    
+
     // Dashboard Advisory
     advisory_title: "Smart Crop Advisory",
     crop: "Crop",
@@ -107,7 +107,7 @@ export const translations = {
     nav_brand: "स्मार्टक्रॉप",
     nav_farmer: "किसान",
     nav_portal: "अधिकारी पोर्टल",
-    
+
     // Farmer Login Page
     farmer_login_title: "किसान लॉगिन",
     enter_mobile: "शुरू करने के लिए अपना मोबाइल नंबर दर्ज करें",
@@ -121,7 +121,7 @@ export const translations = {
     resend_in: "पुनः भेजें",
     seconds_abbr: "सेकंड",
     otp_sent_success: "OTP कोड आपके मोबाइल पर SMS द्वारा भेजा गया है।",
-    
+
     // Farmer Chat Page
     chat_title: "स्मार्टक्रॉप सहायक",
     chat_subtitle: "मुझसे मौसम, कीमतों या फसल की समस्याओं के बारे में पूछें!",
@@ -132,7 +132,7 @@ export const translations = {
     chat_placeholder: "अपना संदेश टाइप करें या माइक पर टैप करें...",
     listening_text: "सुन रहा हूँ... अब बोलें।",
     chat_error: "क्षमा करें, मुझे अभी कनेक्ट करने में समस्या हो रही है। कृपया पुनः प्रयास करें।",
-    
+
     // Officer Login Page
     officer_portal_title: "अधिकारी पोर्टल",
     officer_sign_in: "निगरानी डैशबोर्ड तक पहुंचने के लिए साइन इन करें",
@@ -143,7 +143,7 @@ export const translations = {
     password_placeholder: "पासवर्ड (123)",
     access_dashboard: "डैशबोर्ड एक्सेस करें",
     back_to_roles: "भूमिका चयन पर वापस जाएं",
-    
+
     // Officer Dashboard
     dashboard_title: "स्मार्टक्रॉप डैशबोर्ड",
     total_farmers: "कुल किसान",
@@ -158,7 +158,7 @@ export const translations = {
     fetch_error: "डैशबोर्ड डेटा प्राप्त करने में विफल। सुनिश्चित करें कि बैकएंड चल रहा है।",
     alert_sent: "अलर्ट सफलतापूर्वक भेजा गया!",
     alert_failed: "अलर्ट भेजने में विफल।",
-    
+
     // Dashboard Advisory
     advisory_title: "स्मार्ट क्रॉप सलाहकार",
     crop: "फसल",
@@ -201,7 +201,7 @@ export const translations = {
     nav_brand: "ସ୍ମାର୍ଟକ୍ରପ୍",
     nav_farmer: "କୃଷକ",
     nav_portal: "ଅଧିକାରୀ ପୋର୍ଟାଲ୍",
-    
+
     // Farmer Login Page
     farmer_login_title: "କୃଷକ ଲଗଇନ୍",
     enter_mobile: "ଆରମ୍ଭ କରିବାକୁ ଆପଣଙ୍କର ମୋବାଇଲ୍ ନମ୍ବର ପ୍ରବେଶ କରନ୍ତୁ",
@@ -215,7 +215,7 @@ export const translations = {
     resend_in: "ପୁନର୍ବାର ପଠାନ୍ତୁ",
     seconds_abbr: "ସେକେଣ୍ଡ",
     otp_sent_success: "OTP କୋଡ୍ ଆପଣଙ୍କ ମୋବାଇଲକୁ SMS ମାଧ୍ୟମରେ ପଠାଯାଇଛି |",
-    
+
     // Farmer Chat Page
     chat_title: "ସ୍ମାର୍ଟକ୍ରପ୍ ସହାୟକ",
     chat_subtitle: "ମୋତେ ପାଣିପାଗ, ମୂଲ୍ୟ କିମ୍ବା ଫସଲ ସମସ୍ୟା ବିଷୟରେ ପଚାରନ୍ତୁ!",
@@ -226,7 +226,7 @@ export const translations = {
     chat_placeholder: "ଆପଣଙ୍କର ବାର୍ତ୍ତା ଟାଇପ୍ କରନ୍ତୁ କିମ୍ବା ମାଇକ୍ ଟ୍ୟାପ୍ କରନ୍ତୁ...",
     listening_text: "ଶୁଣୁଛି... ବର୍ତ୍ତମାନ କୁହନ୍ତୁ |",
     chat_error: "କ୍ଷମା କରିବେ, ବର୍ତ୍ତମାନ ସଂଯୋଗ କରିବାରେ ଅସୁବିଧା ହେଉଛି | ଦୟାକରି ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ |",
-    
+
     // Officer Login Page
     officer_portal_title: "ଅଧିକାରୀ ପୋର୍ଟାଲ୍",
     officer_sign_in: "ମନିଟରିଂ ଡ୍ୟାସବୋର୍ଡକୁ ପ୍ରବେଶ କରିବା ପାଇଁ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ",
@@ -237,7 +237,7 @@ export const translations = {
     password_placeholder: "ପାସୱାର୍ଡ (123)",
     access_dashboard: "ଡ୍ୟାସବୋର୍ଡକୁ ପ୍ରବେଶ କରନ୍ତୁ",
     back_to_roles: "ଭୂମିକା ଚୟନକୁ ଫେରନ୍ତୁ",
-    
+
     // Officer Dashboard
     dashboard_title: "ସ୍ମାର୍ଟକ୍ରପ୍ ଡ୍ୟାସବୋର୍ଡ",
     total_farmers: "ମୋଟ କୃଷକ",
@@ -252,7 +252,7 @@ export const translations = {
     fetch_error: "ଡ୍ୟାସବୋର୍ଡ ତଥ୍ୟ ଆଣିବାରେ ବିଫଳ | ନିଶ୍ଚିତ କରନ୍ତୁ ଯେ ବ୍ୟାକଏଣ୍ଡ୍ ଚାଲୁଛି |",
     alert_sent: "ସତର୍କ ସୂଚନା ସଫଳତାର ସହିତ ପଠାଯାଇଛି!",
     alert_failed: "ସତର୍କ ସୂଚନା ପଠାଇବାରେ ବିଫଳ |",
-    
+
     // Dashboard Advisory
     advisory_title: "ସ୍ମାର୍ଟ ଫସଲ ପରାମର୍ଶ",
     crop: "ଫସଲ",
@@ -266,7 +266,7 @@ export const translations = {
     mandi_prices: "ମଣ୍ଡି ଦର",
     distress_risk: "ସଙ୍କଟ ବିପଦ",
     moderate: "ମଧ୍ୟମ",
-    
+
     // Weather Widget
     humidity: "ଆର୍ଦ୍ରତା",
     wind: "ପବନ",
