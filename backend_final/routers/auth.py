@@ -26,7 +26,7 @@ def check_mobile(req: schemas.PhoneCheckRequest, db: Session = Depends(get_db)):
         
     farmer = db.query(FarmerLoginDetails).filter(FarmerLoginDetails.phone == phone).first()
     exists = farmer is not None
-    msg = "Mobile number registered. Please enter your 4-digit PIN to log in." if exists else "New farmer account. Please enter your details and set a 4-digit PIN to register."
+    msg = "Mobile number registered. Please enter your 4-digit PIN to log in." if exists else "New farmer account. Please set a 4-digit PIN to register."
     
     return {
         "status": "success",
@@ -46,26 +46,35 @@ def register_pin(req: schemas.PinRegisterRequest, db: Session = Depends(get_db))
     if len(pin) != 4 or not pin.isdigit():
         raise HTTPException(status_code=400, detail="PIN must be exactly 4 numeric digits.")
         
+    first_name = (req.first_name and req.first_name.strip()) or "Farmer"
+    last_name = (req.last_name and req.last_name.strip()) or (phone[-4:] if len(phone) >= 4 else "Node")
+    district = req.district.strip() if (req.district and req.district.strip()) else "Cuttack"
+    dob = req.dob.strip() if (req.dob and req.dob.strip()) else "1990-01-01"
+    land_area = float(req.land_area_ha or 2.5)
+    pref_lang = (req.preferred_language and req.preferred_language.strip()) or "en"
+
     existing = db.query(FarmerLoginDetails).filter(FarmerLoginDetails.phone == phone).first()
     if existing:
         # Update existing profile and PIN
         existing.pin = pin
-        existing.first_name = req.first_name or existing.first_name
-        existing.last_name = req.last_name or existing.last_name
-        existing.district = req.district or existing.district
-        existing.dob = req.dob or existing.dob
-        existing.land_area_ha = float(req.land_area_ha or 2.5)
+        existing.first_name = first_name if first_name != "Farmer" else (existing.first_name or first_name)
+        existing.last_name = last_name if last_name != phone[-4:] else (existing.last_name or last_name)
+        existing.district = district or existing.district
+        existing.dob = dob or existing.dob
+        existing.land_area_ha = land_area or existing.land_area_ha
+        existing.preferred_language = pref_lang or existing.preferred_language or "en"
         farmer = existing
     else:
         # Create new farmer login details record in SQLite login_details.db
         farmer = FarmerLoginDetails(
             phone=phone,
             pin=pin,
-            first_name=req.first_name or "",
-            last_name=req.last_name or "",
-            district=req.district or "Cuttack",
-            dob=req.dob or "",
-            land_area_ha=float(req.land_area_ha or 2.5)
+            first_name=first_name,
+            last_name=last_name,
+            district=district,
+            dob=dob,
+            land_area_ha=land_area,
+            preferred_language=pref_lang
         )
         db.add(farmer)
         
@@ -78,14 +87,15 @@ def register_pin(req: schemas.PinRegisterRequest, db: Session = Depends(get_db))
         "token": token,
         "role": "farmer",
         "phone": phone,
-        "message": "4-digit PIN & Farmer Profile registered successfully in SQLite database (login_details.db)!",
+        "message": f"Farmer account for mobile {phone} registered successfully!",
         "profile": {
             "phone": farmer.phone,
             "first_name": farmer.first_name,
             "last_name": farmer.last_name,
             "district": farmer.district,
             "dob": farmer.dob,
-            "land_area_ha": farmer.land_area_ha
+            "land_area_ha": farmer.land_area_ha,
+            "preferred_language": farmer.preferred_language or "en"
         }
     }
 
@@ -102,7 +112,7 @@ def login_pin(req: schemas.PinLoginRequest, db: Session = Depends(get_db)):
     if not farmer:
         raise HTTPException(
             status_code=404, 
-            detail="Mobile number not registered yet. Please set up your profile and 4-digit PIN."
+            detail=f"Mobile number {phone} is not registered yet. Click 'Sign Up' below to create your account in 5 seconds!"
         )
         
     # Strict PIN verification matching login_details.db record
@@ -125,7 +135,8 @@ def login_pin(req: schemas.PinLoginRequest, db: Session = Depends(get_db)):
             "last_name": farmer.last_name,
             "district": farmer.district,
             "dob": farmer.dob,
-            "land_area_ha": farmer.land_area_ha
+            "land_area_ha": farmer.land_area_ha,
+            "preferred_language": farmer.preferred_language or "en"
         }
     }
 
@@ -145,7 +156,8 @@ def get_farmer_profile(phone: str, db: Session = Depends(get_db)):
             "last_name": farmer.last_name,
             "district": farmer.district,
             "dob": farmer.dob,
-            "land_area_ha": farmer.land_area_ha
+            "land_area_ha": farmer.land_area_ha,
+            "preferred_language": farmer.preferred_language or "en"
         }
     }
 
@@ -175,7 +187,7 @@ def verify_otp(req: schemas.OTPVerify, db: Session = Depends(get_db)):
             raise HTTPException(status_code=401, detail="Incorrect 4-digit PIN. Please enter your registered PIN.")
     else:
         if len(pin) == 4 and pin.isdigit():
-            farmer = FarmerLoginDetails(phone=phone, pin=pin)
+            farmer = FarmerLoginDetails(phone=phone, pin=pin, first_name="Farmer", last_name=phone[-4:])
             db.add(farmer)
             db.commit()
             db.refresh(farmer)

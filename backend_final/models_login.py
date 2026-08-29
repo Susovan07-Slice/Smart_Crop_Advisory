@@ -13,4 +13,5 @@ class FarmerLoginDetails(LoginBase):
     district = Column(String, default="Cuttack")
     dob = Column(String, nullable=True)
     land_area_ha = Column(Float, default=2.5)
+    preferred_language = Column(String, default="en")
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -16,7 +16,7 @@ const getWeatherIcon = (code, className) => {
   return <Cloud className={`text-gray-400 ${className}`} />;
 };
 
-const WeatherWidget = ({ location }) => {
+const WeatherWidget = ({ location, isDarkMode }) => {
   const { t } = useLanguage();
   const [weatherData, setWeatherData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -87,8 +87,10 @@ const WeatherWidget = ({ location }) => {
 
   if (loading || !weatherData) {
     return (
-      <div className="w-full bg-white rounded-xl shadow-sm border border-gray-100 p-4 h-64 flex items-center justify-center transition-colors">
-        <div className="animate-pulse text-gray-400 font-medium">{t('loading_weather')}</div>
+      <div className={`w-full rounded-2xl border p-4 h-64 flex items-center justify-center transition-colors ${
+        isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-gray-100 text-gray-400 shadow-sm'
+      }`}>
+        <div className="animate-pulse font-medium">{t('loading_weather')}</div>
       </div>
     );
   }
@@ -148,11 +150,11 @@ const WeatherWidget = ({ location }) => {
       <div className="relative w-full overflow-x-auto scrollbar-hide pt-4">
         <div className="min-w-[400px]">
           <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-[70px] overflow-visible">
-            <path d={areaPath} fill="#fef3c7" opacity="0.8" />
-            <line x1="0" y1="60" x2={svgWidth} y2="60" stroke="#fde047" strokeWidth="2" />
+            <path d={areaPath} fill={isDarkMode ? "#78350f" : "#fef3c7"} opacity={isDarkMode ? "0.4" : "0.8"} />
+            <line x1="0" y1="60" x2={svgWidth} y2="60" stroke={isDarkMode ? "#a16207" : "#fde047"} strokeWidth="2" />
             <path d={linePath} fill="none" stroke="#eab308" strokeWidth="2" />
             {points.slice(1, -1).map((p, i) => (
-              <text key={i} x={p.x} y={p.y - 8} fontSize="12" fill="currentColor" textAnchor="middle" className="font-semibold text-gray-500">
+              <text key={i} x={p.x} y={p.y - 8} fontSize="12" fill={isDarkMode ? "#fef08a" : "#6b7280"} textAnchor="middle" className="font-bold">
                 {p.temp}°
               </text>
             ))}
@@ -182,11 +184,11 @@ const WeatherWidget = ({ location }) => {
       <div className="relative w-full overflow-x-auto scrollbar-hide pt-4">
         <div className="min-w-[400px]">
           <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-[70px] overflow-visible">
-            <path d={areaData} fill="#dbeafe" opacity="0.8" />
+            <path d={areaData} fill={isDarkMode ? "#1e3a8a" : "#dbeafe"} opacity="0.8" />
             <path d={lineData} fill="none" stroke="#3b82f6" strokeWidth="2" />
             {hourly.map((h, i) => (
               h.precip > 0 && (
-                <text key={i} x={(i * pointWidth) + (pointWidth / 2)} y={(svgHeight - (h.precip / 100) * 50) - 8} fontSize="11" fill="currentColor" textAnchor="middle" className="font-bold text-blue-600">
+                <text key={i} x={(i * pointWidth) + (pointWidth / 2)} y={(svgHeight - (h.precip / 100) * 50) - 8} fontSize="11" fill={isDarkMode ? "#93c5fd" : "#2563eb"} textAnchor="middle" className="font-bold">
                   {h.precip}%
                 </text>
               )
@@ -203,7 +205,7 @@ const WeatherWidget = ({ location }) => {
         <div className="min-w-[400px] flex justify-between px-2 h-[70px] items-center">
           {hourly.map((h, i) => (
             <div key={i} className="flex flex-col items-center justify-center w-[50px]">
-              <span className="text-xs font-medium text-gray-700 mb-2">{h.windSpeed} km/h</span>
+              <span className={`text-xs font-semibold mb-2 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>{h.windSpeed} km/h</span>
               <ArrowUp 
                 className="h-4 w-4 text-blue-400" 
                 style={{ transform: `rotate(${h.windDir}deg)` }} 
@@ -216,40 +218,56 @@ const WeatherWidget = ({ location }) => {
   };
 
   return (
-    <div className="w-full bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col space-y-4 transition-colors">
+    <div className={`w-full rounded-2xl border p-4 sm:p-5 flex flex-col space-y-4 transition-colors ${
+      isDarkMode 
+        ? 'bg-slate-800 border-slate-700 text-white shadow-md' 
+        : 'bg-white border-gray-100 text-gray-900 shadow-sm'
+    }`}>
       {/* Top Section: Current Weather */}
       <div className="flex justify-between items-start">
         <div className="flex items-center space-x-3">
           {getWeatherIcon(weatherData.current.weatherCode,"h-14 w-14 sm:h-16 sm:w-16 drop-shadow-sm")}
           <div className="flex flex-col">
-            <div className="text-4xl sm:text-5xl font-light text-gray-800 tracking-tighter">
-              {weatherData.current.temp}<span className="text-2xl sm:text-3xl text-gray-400 font-normal">°C</span>
+            <div className={`text-4xl sm:text-5xl font-light tracking-tighter ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+              {weatherData.current.temp}<span className={`text-2xl sm:text-3xl font-normal ${isDarkMode ? 'text-slate-400' : 'text-gray-400'}`}>°C</span>
             </div>
           </div>
         </div>
-        <div className="flex flex-col space-y-1 text-xs sm:text-sm text-gray-500 text-right pt-1">
-          <div><span className="font-medium text-gray-700">{t('precipitation')}:</span> {weatherData.current.precipProb}%</div>
-          <div><span className="font-medium text-gray-700">{t('humidity')}:</span> {weatherData.current.humidity}%</div>
-          <div><span className="font-medium text-gray-700">{t('wind')}:</span> {weatherData.current.wind} km/h</div>
+        <div className={`flex flex-col space-y-1 text-xs sm:text-sm text-right pt-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-500'}`}>
+          <div><span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-700'}`}>{t('precipitation')}:</span> {weatherData.current.precipProb}%</div>
+          <div><span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-700'}`}>{t('humidity')}:</span> {weatherData.current.humidity}%</div>
+          <div><span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-700'}`}>{t('wind')}:</span> {weatherData.current.wind} km/h</div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex space-x-6 border-b border-gray-200 mt-2">
+      <div className={`flex space-x-6 border-b mt-2 ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
         <div 
-          className={`text-sm font-medium pb-2 px-1 cursor-pointer transition-colors capitalize ${activeTab === 'temperature' ? 'text-gray-800 border-b-2 border-yellow-500' : 'text-gray-500 hover:text-gray-700 '}`}
+          className={`text-sm font-bold pb-2 px-1 cursor-pointer transition-colors capitalize ${
+            activeTab === 'temperature' 
+              ? isDarkMode ? 'text-amber-400 border-b-2 border-amber-400' : 'text-gray-800 border-b-2 border-yellow-500' 
+              : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'
+          }`}
           onClick={() => setActiveTab('temperature')}
         >
           {t('temperature')}
         </div>
         <div 
-          className={`text-sm font-medium pb-2 px-1 cursor-pointer transition-colors capitalize ${activeTab === 'precipitation' ? 'text-gray-800 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700 '}`}
+          className={`text-sm font-bold pb-2 px-1 cursor-pointer transition-colors capitalize ${
+            activeTab === 'precipitation' 
+              ? isDarkMode ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-800 border-b-2 border-blue-500' 
+              : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'
+          }`}
           onClick={() => setActiveTab('precipitation')}
         >
           {t('precipitation')}
         </div>
         <div 
-          className={`text-sm font-medium pb-2 px-1 cursor-pointer transition-colors capitalize ${activeTab === 'wind' ? 'text-gray-800 border-b-2 border-gray-400' : 'text-gray-500 hover:text-gray-700 '}`}
+          className={`text-sm font-bold pb-2 px-1 cursor-pointer transition-colors capitalize ${
+            activeTab === 'wind' 
+              ? isDarkMode ? 'text-slate-200 border-b-2 border-slate-300' : 'text-gray-800 border-b-2 border-gray-400' 
+              : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'
+          }`}
           onClick={() => setActiveTab('wind')}
         >
           {t('wind')}
@@ -263,10 +281,10 @@ const WeatherWidget = ({ location }) => {
         {activeTab === 'wind' && renderWindChart()}
         
         {/* X-Axis Labels (Time) */}
-        <div className="w-full overflow-x-auto scrollbar-hide border-t border-gray-100 pt-2 mt-1">
+        <div className={`w-full overflow-x-auto scrollbar-hide border-t pt-2 mt-1 ${isDarkMode ? 'border-slate-700' : 'border-gray-100'}`}>
           <div className="min-w-[400px] flex justify-between px-2">
             {hourly.map((h, i) => (
-              <div key={i} className="text-[10px] text-gray-500 font-medium w-[50px] text-center">
+              <div key={i} className={`text-[10px] font-semibold w-[50px] text-center ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
                 {h.label}
               </div>
             ))}
@@ -275,16 +293,16 @@ const WeatherWidget = ({ location }) => {
       </div>
 
       {/* Bottom Section: 7-Day Forecast */}
-      <div className="flex overflow-x-auto pt-2 pb-1 space-x-4 sm:space-x-6 scrollbar-hide border-t border-gray-100">
+      <div className={`flex overflow-x-auto pt-2 pb-1 space-x-4 sm:space-x-6 scrollbar-hide border-t ${isDarkMode ? 'border-slate-700' : 'border-gray-100'}`}>
         {weatherData.daily.map((day, index) => (
           <div key={day.date} className="flex flex-col items-center min-w-[3.5rem]">
-            <span className="text-[11px] font-medium text-gray-600 mb-2 capitalize">
+            <span className={`text-[11px] font-semibold mb-2 capitalize ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>
               {getDayName(day.date, index)}
             </span>
             {getWeatherIcon(day.weatherCode,"h-6 w-6 mb-2")}
             <div className="flex items-center space-x-1 text-xs">
-              <span className="font-medium text-gray-800">{day.maxTemp}°</span>
-              <span className="text-gray-400">{day.minTemp}°</span>
+              <span className={`font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{day.maxTemp}°</span>
+              <span className={isDarkMode ? 'text-slate-400' : 'text-gray-400'}>{day.minTemp}°</span>
             </div>
           </div>
         ))}

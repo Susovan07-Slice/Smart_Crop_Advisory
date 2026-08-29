@@ -14,7 +14,7 @@ from routers import ml, weather, chat, auth, farmers, loan
 
 # Initialize Main SQLite DB & Login Details SQLite DB (login_details.db)
 models.Base.metadata.create_all(bind=database.engine)
-models_login.LoginBase.metadata.create_all(bind=database_login.login_engine)
+database_login.init_login_db()
 
 app = FastAPI(
     title="SmartCrop Unified AI Agriculture API",

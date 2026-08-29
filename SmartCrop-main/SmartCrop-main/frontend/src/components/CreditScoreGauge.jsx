@@ -2,53 +2,58 @@ import React from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Sprout, Info, ArrowRight, Wallet, Percent, Wheat, Calculator } from 'lucide-react';
 
-const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, onEditLoan }) => {
+const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, loanProfile = {}, onEditLoan, isDarkMode }) => {
   const { t } = useLanguage();
-  const normalizedScore = Math.max(0, Math.min(100, Math.round(score)));
+  
+  // Distress Score ranges from 0 (very low distress) to 100 (high distress)
+  const distressScore = Math.max(0, Math.min(100, Math.round(score)));
 
-  // Determine category theme based on normalized distress score (0-100)
-  const getScoreTheme = (s) => {
-    if (s <= 35) {
+  // Determine category theme based on distress score
+  const getScoreTheme = (dScore) => {
+    if (dScore <= 35) {
       return {
         badgeText: `${t('very_low')} ${t('financial_distress')}`,
-        badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+        badgeClass: isDarkMode ? "bg-emerald-900/70 text-emerald-300 border-emerald-700" : "bg-emerald-100 text-emerald-800 border-emerald-300",
+        scoreColor: isDarkMode ? "text-emerald-400" : "text-emerald-600",
         barColor: "bg-emerald-500",
         message: t('good_position_msg'),
-        loanBurdenPct: 25,
-        loanBurdenLevel: t('level_low'),
-        interestBurdenPct: 20,
+        loanBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.outstanding_principal || 50000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 10,
+        loanBurdenLevel: hasLoan ? (loanProfile.outstanding_principal > 100000 ? t('level_moderate') : t('level_low')) : t('level_low'),
+        interestBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.annual_interest_rate || 7) / 18) * 100)) : 10,
         interestBurdenLevel: t('level_low'),
-        incomeRiskPct: 30,
+        incomeRiskPct: 25,
         incomeRiskLevel: t('level_low'),
-        repaymentPct: 85,
+        repaymentPct: hasLoan ? Math.min(100, Math.round(((loanProfile.total_amount_repaid || 30000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 90,
         repaymentLevel: t('level_good')
       };
-    } else if (s <= 65) {
+    } else if (dScore <= 65) {
       return {
         badgeText: `${t('moderate')} ${t('financial_distress')}`,
-        badgeClass: "bg-amber-100 text-amber-900 border-amber-300",
+        badgeClass: isDarkMode ? "bg-amber-900/70 text-amber-300 border-amber-700" : "bg-amber-100 text-amber-900 border-amber-300",
+        scoreColor: isDarkMode ? "text-amber-400" : "text-amber-600",
         barColor: "bg-amber-500",
         message: t('moderate_position_msg'),
         loanBurdenPct: 55,
         loanBurdenLevel: t('level_moderate'),
         interestBurdenPct: 50,
         interestBurdenLevel: t('level_moderate'),
-        incomeRiskPct: 60,
+        incomeRiskPct: 55,
         incomeRiskLevel: t('level_moderate'),
-        repaymentPct: 55,
+        repaymentPct: 50,
         repaymentLevel: t('level_fair')
       };
     } else {
       return {
         badgeText: `${t('high')} ${t('financial_distress')}`,
-        badgeClass: "bg-red-100 text-red-800 border-red-300",
+        badgeClass: isDarkMode ? "bg-rose-900/70 text-rose-300 border-rose-700" : "bg-red-100 text-red-800 border-red-300",
+        scoreColor: isDarkMode ? "text-rose-400" : "text-red-600",
         barColor: "bg-red-500",
         message: t('high_position_msg'),
         loanBurdenPct: 85,
         loanBurdenLevel: t('level_high'),
         interestBurdenPct: 80,
         interestBurdenLevel: t('level_high'),
-        incomeRiskPct: 85,
+        incomeRiskPct: 80,
         incomeRiskLevel: t('level_high'),
         repaymentPct: 25,
         repaymentLevel: t('level_critical')
@@ -56,39 +61,51 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, o
     }
   };
 
-  const theme = getScoreTheme(normalizedScore);
+  const theme = getScoreTheme(distressScore);
 
   return (
-    <div className="bg-white/95 backdrop-blur-md border border-emerald-200/90 rounded-3xl p-5 sm:p-6 shadow-xs w-full flex flex-col md:flex-row items-stretch justify-between gap-6 transition-all">
+    <div className={`rounded-3xl p-5 sm:p-6 border w-full flex flex-col md:flex-row items-stretch justify-between gap-6 transition-all ${
+      isDarkMode 
+        ? 'bg-slate-800 border-slate-700 text-white shadow-xl' 
+        : 'bg-white/95 backdrop-blur-md border-emerald-200/90 text-gray-900 shadow-xs'
+    }`}>
       
       {/* Left Column: Score & Status Overview */}
-      <div className="flex-1 flex flex-col justify-between space-y-3 pr-0 md:pr-4 md:border-r border-gray-100">
+      <div className={`flex-1 flex flex-col justify-between space-y-3 pr-0 md:pr-4 md:border-r ${
+        isDarkMode ? 'border-slate-700' : 'border-gray-100'
+      }`}>
         
         <div className="flex items-center space-x-3">
-          <div className="p-2.5 bg-emerald-100/90 rounded-2xl border border-emerald-200 shadow-2xs">
-            <Sprout className="h-6 w-6 text-emerald-700 shrink-0" />
+          <div className={`p-2.5 rounded-2xl border shadow-2xs ${
+            isDarkMode ? 'bg-emerald-950 border-emerald-800 text-emerald-400' : 'bg-emerald-100/90 border-emerald-200 text-emerald-700'
+          }`}>
+            <Sprout className="h-6 w-6 shrink-0" />
           </div>
           <div>
-            <h3 className="text-base font-black text-gray-900 tracking-tight flex items-center gap-1.5">
-              {t('financial_health_title')}
-              <Info className="h-3.5 w-3.5 text-gray-400 cursor-pointer hover:text-gray-600" title={t('financial_distress_subtitle')} />
+            <h3 className={`text-base font-black tracking-tight flex items-center gap-1.5 ${
+              isDarkMode ? 'text-white' : 'text-gray-900'
+            }`}>
+              FINANCIAL DISTRESS SCORE
+              <Info className={`h-3.5 w-3.5 cursor-pointer ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-400 hover:text-gray-600'}`} title="Financial Distress Score (0-100) calculated from interest burden, loan principal ratio & net farm profit." />
             </h3>
-            <p className="text-xs text-gray-500 font-medium">{t('financial_distress_subtitle')}</p>
+            <p className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+              Financial Distress Index (Lower is Better)
+            </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-3 my-1 flex-wrap gap-2">
-          <span className="text-4xl font-black text-emerald-700 tracking-tight font-mono">
-            {normalizedScore}
+          <span className={`text-4xl font-black tracking-tight font-mono ${theme.scoreColor}`}>
+            {distressScore}
           </span>
-          <span className="text-sm font-bold text-gray-400">/ 100</span>
+          <span className={`text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-gray-400'}`}>/ 100</span>
 
           <span className={`text-xs font-black px-3 py-1 rounded-full border shadow-2xs ${theme.badgeClass}`}>
             {theme.badgeText}
           </span>
         </div>
 
-        <p className="text-xs font-semibold text-gray-600 italic">
+        <p className={`text-xs font-semibold italic ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>
           "{theme.message}"
         </p>
       </div>
@@ -99,20 +116,22 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, o
         {/* Metric 1: Loan Burden */}
         <div className="flex items-center justify-between text-xs space-x-3">
           <div className="flex items-center space-x-2 w-36 shrink-0">
-            <div className="p-1 bg-emerald-50 rounded-lg text-emerald-700">
+            <div className={`p-1 rounded-lg ${isDarkMode ? 'bg-slate-700 text-emerald-400' : 'bg-emerald-50 text-emerald-700'}`}>
               <Wallet className="h-3.5 w-3.5" />
             </div>
-            <span className="font-bold text-gray-700 truncate">{t('loan_burden_label')}</span>
+            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>{t('loan_burden_label')}</span>
           </div>
 
-          <div className="flex-1 bg-gray-100 h-2.5 rounded-full overflow-hidden border border-gray-200/60 mx-2">
+          <div className={`flex-1 h-2.5 rounded-full overflow-hidden border mx-2 ${
+            isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
+          }`}>
             <div 
               className={`h-full rounded-full transition-all duration-500 ${theme.barColor}`} 
               style={{ width: `${theme.loanBurdenPct}%` }}
             />
           </div>
 
-          <span className="text-[11px] font-extrabold text-gray-600 w-16 text-right shrink-0">
+          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>
             {theme.loanBurdenLevel}
           </span>
         </div>
@@ -120,20 +139,22 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, o
         {/* Metric 2: Interest Burden */}
         <div className="flex items-center justify-between text-xs space-x-3">
           <div className="flex items-center space-x-2 w-36 shrink-0">
-            <div className="p-1 bg-emerald-50 rounded-lg text-emerald-700">
+            <div className={`p-1 rounded-lg ${isDarkMode ? 'bg-slate-700 text-emerald-400' : 'bg-emerald-50 text-emerald-700'}`}>
               <Percent className="h-3.5 w-3.5" />
             </div>
-            <span className="font-bold text-gray-700 truncate">{t('interest_burden_label')}</span>
+            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>{t('interest_burden_label')}</span>
           </div>
 
-          <div className="flex-1 bg-gray-100 h-2.5 rounded-full overflow-hidden border border-gray-200/60 mx-2">
+          <div className={`flex-1 h-2.5 rounded-full overflow-hidden border mx-2 ${
+            isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
+          }`}>
             <div 
               className={`h-full rounded-full transition-all duration-500 ${theme.barColor}`} 
               style={{ width: `${theme.interestBurdenPct}%` }}
             />
           </div>
 
-          <span className="text-[11px] font-extrabold text-gray-600 w-16 text-right shrink-0">
+          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>
             {theme.interestBurdenLevel}
           </span>
         </div>
@@ -141,20 +162,22 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, o
         {/* Metric 3: Income Risk */}
         <div className="flex items-center justify-between text-xs space-x-3">
           <div className="flex items-center space-x-2 w-36 shrink-0">
-            <div className="p-1 bg-amber-50 rounded-lg text-amber-700">
+            <div className={`p-1 rounded-lg ${isDarkMode ? 'bg-amber-950 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
               <Wheat className="h-3.5 w-3.5" />
             </div>
-            <span className="font-bold text-gray-700 truncate">{t('income_risk_label')}</span>
+            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>{t('income_risk_label')}</span>
           </div>
 
-          <div className="flex-1 bg-gray-100 h-2.5 rounded-full overflow-hidden border border-gray-200/60 mx-2">
+          <div className={`flex-1 h-2.5 rounded-full overflow-hidden border mx-2 ${
+            isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
+          }`}>
             <div 
               className="h-full bg-amber-500 rounded-full transition-all duration-500" 
               style={{ width: `${theme.incomeRiskPct}%` }}
             />
           </div>
 
-          <span className="text-[11px] font-extrabold text-amber-700 w-16 text-right shrink-0">
+          <span className="text-[11px] font-extrabold text-amber-500 w-16 text-right shrink-0">
             {theme.incomeRiskLevel}
           </span>
         </div>
@@ -162,20 +185,22 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, o
         {/* Metric 4: Repayment Capacity */}
         <div className="flex items-center justify-between text-xs space-x-3">
           <div className="flex items-center space-x-2 w-36 shrink-0">
-            <div className="p-1 bg-blue-50 rounded-lg text-blue-700">
+            <div className={`p-1 rounded-lg ${isDarkMode ? 'bg-blue-950 text-blue-400' : 'bg-blue-50 text-blue-700'}`}>
               <Calculator className="h-3.5 w-3.5" />
             </div>
-            <span className="font-bold text-gray-700 truncate">{t('repayment_capacity_label')}</span>
+            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>{t('repayment_capacity_label')}</span>
           </div>
 
-          <div className="flex-1 bg-gray-100 h-2.5 rounded-full overflow-hidden border border-gray-200/60 mx-2">
+          <div className={`flex-1 h-2.5 rounded-full overflow-hidden border mx-2 ${
+            isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
+          }`}>
             <div 
               className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
               style={{ width: `${theme.repaymentPct}%` }}
             />
           </div>
 
-          <span className="text-[11px] font-extrabold text-emerald-700 w-16 text-right shrink-0">
+          <span className="text-[11px] font-extrabold text-emerald-500 w-16 text-right shrink-0">
             {theme.repaymentLevel}
           </span>
         </div>

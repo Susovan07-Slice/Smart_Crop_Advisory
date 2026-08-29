@@ -17,6 +17,7 @@ class FarmerProfileSchema(BaseModel):
     district: Optional[str] = "Cuttack"
     dob: Optional[str] = ""
     land_area_ha: Optional[float] = 2.5
+    preferred_language: Optional[str] = "en"
 
 class PinRegisterRequest(BaseModel):
     phone: str
@@ -26,6 +27,7 @@ class PinRegisterRequest(BaseModel):
     district: Optional[str] = "Cuttack"
     dob: Optional[str] = ""
     land_area_ha: Optional[float] = 2.5
+    preferred_language: Optional[str] = "en"
     role: Optional[str] = "farmer"
 
 class PinLoginRequest(BaseModel):

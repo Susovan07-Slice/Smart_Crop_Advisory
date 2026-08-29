@@ -6,7 +6,7 @@ from schemas.ml import (
 from schemas.loan import LoanProfileInput, CandidateCropScoreItem, LoanDistressBreakdown
 from services.crop_recommendation_service import recommend_crop as run_crop_recommendation
 from services.yield_prediction_service import predict_yield_and_production
-from services.profit_calculator_service import calculate_cost_revenue_profit
+from services.profit_calculator_service import calculate_cost_revenue_profit, format_indian_currency
 from services.loan_distress_service import calculate_loan_distress
 from services.weather_service import get_weather_for_district
 import core.config as config
@@ -231,9 +231,9 @@ def run_loan_aware_farm_analysis(
         "total_revenue_inr": top_cand.expected_gross_revenue,
         "net_profit_inr": top_cand.expected_net_profit,
         "roi_percent": round((top_cand.expected_net_profit / max(1.0, top_cand.total_cultivation_cost)) * 100, 2),
-        "formatted_cost": f"₹{top_cand.total_cultivation_cost:,.2f}",
-        "formatted_revenue": f"₹{top_cand.expected_gross_revenue:,.2f}",
-        "formatted_profit": f"₹{top_cand.expected_net_profit:,.2f}",
+        "formatted_cost": format_indian_currency(top_cand.total_cultivation_cost),
+        "formatted_revenue": format_indian_currency(top_cand.expected_gross_revenue),
+        "formatted_profit": format_indian_currency(top_cand.expected_net_profit),
         "status": "Profitable"
     }
 
