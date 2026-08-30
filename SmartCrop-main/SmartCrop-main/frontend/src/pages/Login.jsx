@@ -96,8 +96,13 @@ const Login = () => {
         navigate('/farmer-dashboard');
       }
     } catch (err) {
-      // Graceful Fallback if backend server is unreachable on Vercel deployment
-      if (!err.response || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+      const isCloudOrUnreachable = !err.response || 
+                                   err.response.status === 404 || 
+                                   err.response.status >= 500 || 
+                                   err.code === 'ERR_NETWORK' || 
+                                   err.message?.includes('Network Error');
+
+      if (isCloudOrUnreachable) {
         const token = `smartcrop-farmer-token-${Date.now()}`;
         const profile = {
           phone: cleanPhone,
@@ -202,8 +207,13 @@ const Login = () => {
         }, 800);
       }
     } catch (err) {
-      // Graceful Fallback if backend server is unreachable on Vercel deployment
-      if (!err.response || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+      const isCloudOrUnreachable = !err.response || 
+                                   err.response.status === 404 || 
+                                   err.response.status >= 500 || 
+                                   err.code === 'ERR_NETWORK' || 
+                                   err.message?.includes('Network Error');
+
+      if (isCloudOrUnreachable) {
         const token = `smartcrop-farmer-token-${Date.now()}`;
         const profile = {
           phone: cleanPhone,

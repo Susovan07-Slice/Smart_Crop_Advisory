@@ -48,8 +48,13 @@ const OfficerLogin = () => {
         navigate('/officer-dashboard');
       }
     } catch (err) {
-      // Graceful fallback for offline localhost or Vercel serverless deployment
-      if (!err.response || err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+      const isCloudOrUnreachable = !err.response || 
+                                   err.response.status === 404 || 
+                                   err.response.status >= 500 || 
+                                   err.code === 'ERR_NETWORK' || 
+                                   err.message?.includes('Network Error');
+
+      if (isCloudOrUnreachable) {
         const rawDist = selectedDistrict || 'Khordha';
         const token = `smartcrop-officer-token-${Date.now()}`;
         localStorage.setItem('officerToken', token);
