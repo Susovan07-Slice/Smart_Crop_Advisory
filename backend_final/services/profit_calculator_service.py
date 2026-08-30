@@ -26,18 +26,37 @@ def format_indian_currency(val: float) -> str:
         formatted = "-" + formatted
     return f"₹{formatted}"
 
+CULTIVATION_COSTS_PER_HA = {
+    'Rice': 65000.0,
+    'Maize': 45000.0,
+    'Groundnut': 55000.0,
+    'Ragi': 22000.0,
+    'Moong(Green Gram)': 20000.0,
+    'Urad': 20000.0,
+    'Horse Gram': 18000.0,
+    'Sesamum': 25000.0,
+    'Potato': 110000.0,
+    'Rapeseed &Mustard': 30000.0,
+    'Wheat': 45000.0,
+    'Sugarcane': 120000.0,
+    'Jute': 50000.0
+}
+
 def calculate_farm_profit(
     crop: str,
     district: str,
     area_ha: float,
     predicted_yield: float,
     mandi_price_per_quintal: float,
-    cost_per_ha: float = 75000.0
+    cost_per_ha: float = None
 ) -> dict:
     """
     Calculate financial breakdown for a crop based on area, yield, price, and cultivation cost.
     Uses Indian numerical formatting (lakhs, crores, thousands).
     """
+    if cost_per_ha is None:
+        cost_per_ha = CULTIVATION_COSTS_PER_HA.get(crop, 40000.0)
+        
     total_cost_inr = round(cost_per_ha * area_ha, 2)
     
     price_per_tonne = mandi_price_per_quintal * 10.0

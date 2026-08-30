@@ -47,12 +47,12 @@ def predict_production(data: ProductionPredictionRequest) -> ProductionPredictio
     )
 
 def run_loan_aware_farm_analysis(
-    district: str = "Cuttack",
-    season: str = "Kharif",
-    area_ha: float = 2.5,
+    district: str,
+    season: str,
+    area_ha: float,
+    loan_input: Optional[LoanProfileInput] = None,
     latitude: Optional[float] = None,
-    longitude: Optional[float] = None,
-    loan_input: Optional[LoanProfileInput] = None
+    longitude: Optional[float] = None
 ) -> Dict[str, Any]:
     if loan_input is None:
         loan_input = LoanProfileInput(has_loan=False)
@@ -62,12 +62,28 @@ def run_loan_aware_farm_analysis(
     hum = weather_data.get("humidity", 76.0)
     rain = weather_data.get("rainfall_mm", 1150.0)
 
+    # Load dynamic district soil profile
+    import os, json
+    profiles_path = os.path.join(os.path.dirname(__file__), '..', 'odisha_district_profiles.json')
+    soil_N, soil_P, soil_K, soil_pH = 56.6, 31.7, 42.8, 6.39
+    if os.path.exists(profiles_path):
+        with open(profiles_path, 'r') as f:
+            profiles = json.load(f)
+            if district in profiles and "soil" in profiles[district]:
+                soil = profiles[district]["soil"]
+                # Add standard basal fertilizer application to native soil (Urea/DAP/MOP)
+                # Without this, the unfertilized native soil only qualifies for hardy crops like Ragi.
+                soil_N = soil.get("N", soil_N) + 25.0
+                soil_P = soil.get("P", soil_P) + 10.0
+                soil_K = soil.get("K", soil_K) + 15.0
+                soil_pH = soil.get("pH", soil_pH)
+
     rec_req = CropRecommendationRequest(
         district=district,
         season=season,
         latitude=latitude,
         longitude=longitude,
-        N=56.6, P=31.7, K=42.8, ph=6.39,
+        N=soil_N, P=soil_P, K=soil_K, ph=soil_pH,
         temperature=temp, humidity=hum, rainfall=rain,
         top_k=5
     )
@@ -91,13 +107,21 @@ def run_loan_aware_farm_analysis(
         )
         yield_rate = y_res['predicted_yield_tonnes_per_ha']
         total_prod = y_res['predicted_total_production_tonnes']
+        
+        from services.weather_service import get_market_price
+        
+        try:
+            market_data = get_market_price(c_name, district)
+            mandi_price = market_data.get("price_per_quintal", 5000.0)
+        except Exception:
+            mandi_price = 5000.0
 
         prof_res = calculate_cost_revenue_profit(
             crop=c_name,
             district=district,
             area_ha=area_ha,
-            production_tonnes=total_prod,
-            mandi_price_per_quintal=None
+            predicted_yield=yield_rate,
+            mandi_price_per_quintal=mandi_price
         )
 
         cost_per_ha = prof_res['cost_per_ha_inr']

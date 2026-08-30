@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
 import { Phone, ArrowRight, Loader2, History, X, CheckCircle2, Sprout, Lock, User, Calendar, MapPin, Ruler, UserPlus, LogIn, Globe } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-
+import LocationPickerMap from '../components/LocationPickerMap';
 const ODISHA_DISTRICTS = [
   "Angul","Balangir","Balasore","Bargarh","Bhadrak","Boudh","Cuttack","Deogarh", 
   "Dhenkanal","Gajapati","Ganjam","Jagatsinghpur","Jajpur","Jharsuguda","Kalahandi", 
@@ -430,23 +430,14 @@ const Login = () => {
 
             {/* District & DOB (OPTIONAL / PRE-FILLED) */}
             <div className="grid grid-cols-2 gap-2.5">
-              <div>
-                <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1 flex items-center">
-                  <MapPin className="h-3.5 w-3.5 mr-1 text-red-500" />
-                  {t('district_label')}
-                </label>
-                <select
-                  value={district}
-                  onChange={(e) => setDistrict(e.target.value)}
-                  className="w-full bg-white border border-gray-300 rounded-xl px-2.5 py-2 text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none"
-                >
-                  {ODISHA_DISTRICTS.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
+              <div className="col-span-2 mt-2">
+                <LocationPickerMap 
+                  initialDistrict={district}
+                  onLocationSelect={(selectedDist) => setDistrict(selectedDist)}
+                />
               </div>
 
-              <div>
+              <div className="col-span-2">
                 <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1 flex items-center">
                   <Calendar className="h-3.5 w-3.5 mr-1 text-blue-500" />
                   {t('dob_label')}

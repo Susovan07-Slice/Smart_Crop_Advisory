@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
+import apiClient from '../api/client';
 import FarmerChat from './FarmerChat';
 import { 
-  MapPin, Sprout, TrendingUp, DollarSign, Award, Search, ChevronDown, 
-  LocateFixed, LineChart, ShieldCheck, Volume2, X, User, Sun, Moon, CreditCard,
-  Droplets, Clock, Sparkles, Globe
+  MapPin, Sprout, TrendingUp, Calendar, Ruler, DollarSign, Award, Search, ChevronDown, 
+  LocateFixed, LineChart, ShieldCheck, Volume2, VolumeX, X, User, Sun, Moon, CreditCard,
+  Droplets, Clock, Sparkles, Globe, Mic, Send, Loader2, MessageSquare
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import LocationPickerMap from '../components/LocationPickerMap';
 import WeatherWidget from '../components/WeatherWidget';
 import CreditScoreGauge from '../components/CreditScoreGauge';
 import LoanInformationModal from '../components/LoanInformationModal';
@@ -20,10 +22,10 @@ const formatIndianCurrency = (val, compact = false) => {
   const sign = num < 0 ? '-' : '';
 
   if (compact) {
-    if (absNum >= 10000000) { // 1 Crore
+    if (absNum >= 10000000) {
       return `${sign}₹${(absNum / 10000000).toFixed(2)} Cr`;
     }
-    if (absNum >= 100000) { // 1 Lakh
+    if (absNum >= 100000) {
       return `${sign}₹${(absNum / 100000).toFixed(2)} Lakh`;
     }
     if (absNum >= 1000) {
@@ -38,7 +40,6 @@ const formatIndianCurrency = (val, compact = false) => {
   if (absNum >= 100000) {
     return `${sign}₹${absNum.toLocaleString('en-IN')} (${(absNum / 100000).toFixed(2)} Lakh)`;
   }
-
   return `${sign}₹${absNum.toLocaleString('en-IN')}`;
 };
 
@@ -116,23 +117,23 @@ const ODISHA_DISTRICTS_COORDS = {
 };
 
 const CROP_NAME_MAP = {
-  Rice: { hi: "धान", or: "ଧାନ" },
-  Ragi: { hi: "रागी (मडुआ)", or: "ମାଣ୍ଡିଆ (ରାଗି)" },
-  "Moong(Green Gram)": { hi: "मूंग (हरा चना)", or: "ମୁଗ (ସବୁଜ ଡାଲି)" },
-  Moong: { hi: "मूंग (हरा चना)", or: "ମୁଗ (ସବୁଜ ଡାଲି)" },
+  Rice: { hi: "चावल", or: "ଧାନ" },
+  Ragi: { hi: "रागी (मडुआ)", or: "ମାଣ୍ଡିଆ" },
+  "Moong(Green Gram)": { hi: "मूंग (हरा चना)", or: "ମୁଗ" },
+  Moong: { hi: "मूंग", or: "ମୁଗ" },
   Groundnut: { hi: "मूंगफली", or: "ଚିନାବାଦାମ" },
-  Jute: { hi: "जूट", or: "ଜୋଟ" },
+  Jute: { hi: "जूट", or: "ଝୋଟ" },
   Maize: { hi: "मक्का", or: "ମକା" },
   Cotton: { hi: "कपास", or: "କପା" },
-  Sugarcane: { hi: "गन्ना", or: "ଖୁସି" },
+  Sugarcane: { hi: "गन्ना", or: "ଆଖୁ" },
   Pulses: { hi: "दालें", or: "ଡାଲି" },
-  Sesamum: { hi: "तिल", or: "ଖସା" },
+  Sesamum: { hi: "तिल", or: "ରାଶି" },
   Wheat: { hi: "गेहूं", or: "ଗହମ" },
   Mustard: { hi: "सरसों", or: "ସୋରିଷ" },
   Potato: { hi: "आलू", or: "ଆଳୁ" },
   Urad: { hi: "उड़द", or: "ବିରି" },
-  Arhar: { hi: "अरहर", or: "ହରଡ" },
-  Gram: { hi: "चना", or: "ବୁଟ" }
+  Arhar: { hi: "अरहर", or: "ହରଡ଼" },
+  Gram: { hi: "चना", or: "ଚଣା" }
 };
 
 const CROP_INSIGHTS_DATABASE = {
@@ -348,7 +349,7 @@ const MandiPriceChart = ({ prices, cropName, isDarkMode }) => {
 const FarmerDashboard = () => {
   const { t, lang } = useLanguage();
   
-  // Theme Mode State (Light ☀️ / Dark 🌙)
+  // Theme Mode State (Light ¸ / Dark 🌙)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem('smartCropTheme') === 'dark';
   });
@@ -373,21 +374,24 @@ const FarmerDashboard = () => {
   });
 
   const [location, setLocation] = useState(() => {
-    return farmerProfile?.district || localStorage.getItem('smartCropLocation') || 'Cuttack';
+    return localStorage.getItem('smartCropLocation') || farmerProfile?.district || 'Cuttack';
   });
 
   const [season, setSeason] = useState('Kharif');
 
-  const [areaHa, setAreaHa] = useState(() => {
-    const savedArea = localStorage.getItem('smartCropLandArea');
+  const [landUnit, setLandUnit] = useState(() => {
+    return localStorage.getItem('smartCropLandUnit') || 'Hectares';
+  });
+  const [displayArea, setDisplayArea] = useState(() => {
+    const savedArea = localStorage.getItem('smartCropDisplayArea');
     if (savedArea) return parseFloat(savedArea) || 2.5;
+    const oldSaved = localStorage.getItem('smartCropLandArea');
+    if (oldSaved) return parseFloat(oldSaved);
     return farmerProfile?.land_area_ha || 2.5;
   });
-
-  const [isLocating, setIsLocating] = useState(false);
-  const [gpsActive, setGpsActive] = useState(false);
-  const [locationNotice, setLocationNotice] = useState('📍 Requesting browser location permission...');
+  const areaHa = landUnit === 'Acres' ? displayArea * 0.404686 : displayArea;
   const [showLocationSelect, setShowLocationSelect] = useState(false);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const locationRef = useRef(null);
 
@@ -407,6 +411,124 @@ const FarmerDashboard = () => {
   const [selectedCrop, setSelectedCrop] = useState('Rice');
   const [selectedInsightCrop, setSelectedInsightCrop] = useState(null);
   const [analysisData, setAnalysisData] = useState(DEFAULT_ANALYSIS_DATA);
+
+  // Real-time NLP Advisory, Voice Input, Speech Synthesis & Writing Language Toggle
+  const [nlpQuery, setNlpQuery] = useState('');
+  const [nlpResponse, setNlpResponse] = useState('');
+  const [nlpLoading, setNlpLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [writingLang, setWritingLang] = useState(lang || 'en');
+
+  const handleVoiceInput = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice search is not supported on this browser. Please type your query!");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = writingLang === 'or' ? 'or-IN' : writingLang === 'hi' ? 'hi-IN' : 'en-IN';
+    recognition.interimResults = false;
+    
+    setIsListening(true);
+    recognition.onstart = () => setIsListening(true);
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setNlpQuery(transcript);
+      setIsListening(false);
+      handleNlpSubmit(transcript, writingLang);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognition.start();
+  };
+
+  const handleReadAloud = (textToRead) => {
+    if (!('speechSynthesis' in window)) {
+      alert("Speech synthesis is not supported in this browser.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const cleanText = (textToRead || '').replace(/[*#`]/g, '');
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = writingLang === 'or' ? 'hi-IN' : writingLang === 'hi' ? 'hi-IN' : 'en-IN';
+    utterance.rate = 0.9;
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleStopReading = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+  };
+
+  const handleNlpSubmit = async (queryParam, langParam) => {
+    const textToQuery = typeof queryParam === 'string' ? queryParam : nlpQuery;
+    const langToUse = typeof langParam === 'string' ? langParam : writingLang;
+
+    const queryToUse = (textToQuery || '').trim();
+    if (!queryToUse) return;
+
+    setNlpLoading(true);
+    handleStopReading();
+
+    let fetchedReply = null;
+
+    try {
+      const res = await apiClient.post('/chat', {
+        message: queryToUse,
+        context: {
+          district: location,
+          season: season,
+          areaha: areaHa,
+          language: langToUse
+        }
+      });
+      if (res.data && res.data.reply) {
+        fetchedReply = res.data.reply;
+      }
+    } catch (e) {
+      console.warn("apiClient note, attempting direct fetch:", e);
+    }
+
+    if (!fetchedReply) {
+      try {
+        const rawRes = await fetch("http://127.0.0.1:8000/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: queryToUse,
+            context: {
+              district: location,
+              season: season,
+              areaha: areaHa,
+              language: langToUse
+            }
+          })
+        });
+        const data = await rawRes.json();
+        if (data && data.reply) {
+          fetchedReply = data.reply;
+        }
+      } catch (err) {
+        console.error("Direct fetch failed:", err);
+      }
+    }
+
+    if (fetchedReply) {
+      setNlpResponse(fetchedReply);
+    } else {
+      setNlpResponse("🌾 **Krushi Sahayak Advisory**: Advisory is active! Try asking about pest control, weather risk, or mandi prices in your district.");
+    }
+
+    setNlpLoading(false);
+  };
 
   const getLocalizedCropName = (rawName) => {
     if (!rawName) return rawName;
@@ -431,40 +553,8 @@ const FarmerDashboard = () => {
     return nearest;
   };
 
-  const requestBrowserLocation = () => {
-    if (!('geolocation' in navigator)) {
-      setLocationNotice('⚠️ Geolocation not supported by browser. Using default: ' + location);
-      return;
-    }
-
-    setIsLocating(true);
-    setLocationNotice('🛰️ Accessing GPS coordinates...');
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const detectedDistrict = getNearestDistrict(latitude, longitude);
-        setLocation(detectedDistrict);
-        setGpsActive(true);
-        setIsLocating(false);
-        setLocationNotice(`✅ GPS Located: ${detectedDistrict} (${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°)`);
-        localStorage.setItem('smartCropLocation', detectedDistrict);
-        runFullPipeline(detectedDistrict, season, areaHa, loanProfile);
-      },
-      (error) => {
-        console.warn("GPS Permission error:", error);
-        setIsLocating(false);
-        setGpsActive(false);
-        setLocationNotice(`📍 Default Location: ${location} (Grant GPS permission in browser for live location)`);
-        runFullPipeline(location, season, areaHa, loanProfile);
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
-    );
-  };
-
   useEffect(() => {
     runFullPipeline(location, season, areaHa, loanProfile);
-    requestBrowserLocation();
 
     const handleOpenLoan = () => setIsLoanModalOpen(true);
     const handleToggleAssistant = () => setIsAssistantOpen(prev => !prev);
@@ -530,8 +620,8 @@ const FarmerDashboard = () => {
         body: JSON.stringify({
           district: distName,
           season: seasonName,
-          area_ha: parseFloat(areaVal) || 2.5,
-          loan_input: currentLoan
+          areaha: parseFloat(areaVal) || 2.5,
+          loaninput: currentLoan
         })
       });
 
@@ -560,10 +650,10 @@ const FarmerDashboard = () => {
   };
 
   const getPriceForecast = (basePrice) => {
-    if (analysisData?.price_forecast) {
-      const pf = analysisData.price_forecast;
+    if (analysisData?.priceforecast) {
+      const pf = analysisData.priceforecast;
       return {
-        priceToday: Math.round(pf.current_price_per_quintal || basePrice || 2300),
+        priceToday: Math.round(pf.currentpriceperquintal || basePrice || 2300),
         price15: Math.round(pf.forecast_15d || (basePrice * 1.038)),
         price30: Math.round(pf.forecast_30d || (basePrice * 1.075)),
         price90: Math.round(pf.forecast_90d || (basePrice * 1.134))
@@ -597,14 +687,14 @@ const FarmerDashboard = () => {
   };
 
   const farmerFinancial = (() => {
-    if (analysisData?.farmer_financial && analysisData.farmer_financial.loan_distress_score > 0) {
-      return analysisData.farmer_financial;
+    if (analysisData?.farmerfinancial && analysisData.farmerfinancial.loandistressscore > 0) {
+      return analysisData.farmerfinancial;
     }
     if (loanProfile.has_loan) {
-      const orig = Number(loanProfile.original_loan_amount) || 100000;
-      const out = Number(loanProfile.outstanding_principal) || 65000;
-      const repaid = Number(loanProfile.total_amount_repaid) || 35000;
-      const rate = Number(loanProfile.annual_interest_rate) || 7.5;
+      const orig = Number(loanProfile.originalloan_amount) || 100000;
+      const out = Number(loanProfile.outstandingprincipal) || 65000;
+      const repaid = Number(loanProfile.totalamountrepaid) || 35000;
+      const rate = Number(loanProfile.annualinterest_rate) || 7.5;
       const profit = analysisData?.profit_analysis?.net_profit_inr || 150000;
 
       const repaymentRatio = Math.min(1, Math.max(0, repaid / (orig || 1)));
@@ -626,14 +716,14 @@ const FarmerDashboard = () => {
 
       return {
         has_loan: true,
-        loan_distress_score: boundedDistress,
-        distress_category: cat
+        loandistressscore: boundedDistress,
+        distresscategory: cat
       };
     }
     return {
       has_loan: false,
-      loan_distress_score: 12,
-      distress_category: "Very Low"
+      loandistressscore: 12,
+      distresscategory: "Very Low"
     };
   })();
 
@@ -692,12 +782,12 @@ const FarmerDashboard = () => {
                   {isDarkMode ? (
                     <>
                       <Sun className="h-4.5 w-4.5 text-amber-400 fill-amber-400" />
-                      <span>☀️ Light Mode</span>
+                      <span>Light Mode</span>
                     </>
                   ) : (
                     <>
                       <Moon className="h-4.5 w-4.5 text-slate-700 fill-slate-700" />
-                      <span>🌙 Dark Mode</span>
+                      <span>Dark Mode</span>
                     </>
                   )}
                 </button>
@@ -709,11 +799,181 @@ const FarmerDashboard = () => {
           </div>
         </div>
 
+        {/* HYPERLOCAL REAL-TIME NLP ADVISORY MODULE (VOICE + TEXT + READ ALOUD + LANGUAGE BUTTONS) */}
+        <div className={`p-5 sm:p-6 rounded-3xl border shadow-md space-y-4 transition-colors duration-300 ${
+          isDarkMode 
+            ? 'bg-slate-800/95 border-emerald-500/40 text-slate-100' 
+            : 'bg-gradient-to-r from-emerald-50/90 via-white to-green-50/80 border-emerald-200/90 text-gray-900'
+        }`}>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3 border-emerald-200/60">
+            <div>
+              <h3 className={`text-base sm:text-lg font-black tracking-tight flex items-center gap-2 ${
+                isDarkMode ? 'text-emerald-300' : 'text-emerald-950'
+              }`}>
+                <Sparkles className="h-5 w-5 text-emerald-600 animate-pulse" />
+                <span>HYPERLOCAL REAL-TIME NLP ADVISORY (VOICE + TEXT)</span>
+              </h3>
+              <p className={`text-xs font-semibold ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                Ask about weather risk, soil NPK nutrients, market price crash, or pest control in your regional language.
+              </p>
+            </div>
+
+            {/* LANGUAGE OF WRITING TOGGLE BUTTONS */}
+            <div className="flex items-center space-x-1.5 bg-emerald-100/70 p-1 rounded-2xl border border-emerald-300 shrink-0">
+              <span className="text-[10px] font-black uppercase text-emerald-950 px-2 flex items-center">
+                  <Globe className="h-3 w-3 mr-1 text-emerald-700" /> Language:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWritingLang('en');
+                    changeLanguage('en');
+                    if (nlpQuery) handleNlpSubmit(nlpQuery, 'en');
+                  }}
+                  className={`px-3 py-1 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                    writingLang === 'en' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-200'
+                  }`}
+                >
+                  🇮🇳 English
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWritingLang('or');
+                    changeLanguage('or');
+                    if (nlpQuery) handleNlpSubmit(nlpQuery, 'or');
+                  }}
+                  className={`px-3 py-1 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                    writingLang === 'or' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-200'
+                  }`}
+                >
+                  🇮🇳 ଓଡ଼ିଆ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWritingLang('hi');
+                    changeLanguage('hi');
+                    if (nlpQuery) handleNlpSubmit(nlpQuery, 'hi');
+                  }}
+                  className={`px-3 py-1 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                    writingLang === 'hi' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-200'
+                  }`}
+                >
+                  🇮🇳 हिन्दी
+                </button>
+            </div>
+          </div>
+
+          {/* INPUT FORM WITH VOICE MIC & GET ADVISORY BUTTON */}
+          <form 
+            onSubmit={(e) => { e.preventDefault(); handleNlpSubmit(nlpQuery, writingLang); }} 
+            className="flex items-center gap-2"
+          >
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={nlpQuery}
+                onChange={(e) => setNlpQuery(e.target.value)}
+                placeholder={
+                  writingLang === 'or'
+                    ? "à¬†à¬ªà¬£à¬™à­à¬• à¬ªà­à¬°à¬¶à­à¬¨ à¬ªà¬šà¬¾à¬°à¬¨à­à¬¤à­ (à¬¯à¬¥à¬¾: à¬§à¬¾à¬¨à¬°à­‡ à¬ªà­‹à¬• à¬¨à¬¿à­Ÿà¬¨à­à¬¤à­à¬°à¬£, à¬®à¬£à­à¬¡à¬¿ à¬¦à¬°, à¬ªà¬¾à¬£à¬¿à¬ªà¬¾à¬—)..."
+                    : writingLang === 'hi'
+                    ? "à¤…à¤ªà¤¨à¤¾ à¤ªà¥à¤°à¤¶à¥à¤¨ à¤ªà¥‚à¤›à¥‡à¤‚ (à¤‰à¤¦à¤¾. à¤§à¤¾à¤¨ à¤®à¥‡à¤‚ à¤•à¥€à¤Ÿ à¤¨à¤¿à¤¯à¤‚à¤¤à¥à¤°à¤£, à¤®à¤‚à¤¡à¥€ à¤­à¤¾à¤µ, à¤®à¥Œà¤¸à¤®)..."
+                    : "Ask your farm question (e.g., stem borer control in rice, mandi price forecast, weather risk)..."
+                }
+                className={`w-full border rounded-2xl py-3 pl-4 pr-12 text-xs sm:text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs ${
+                  isDarkMode ? 'bg-slate-900 text-white border-slate-700' : 'bg-white text-gray-900 border-gray-300'
+                }`}
+              />
+
+              {/* VOICE MIC BUTTON */}
+              <button
+                type="button"
+                onClick={handleVoiceInput}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all cursor-pointer ${
+                  isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                }`}
+                title="Voice Input (Speech-to-Text)"
+              >
+                <Mic className="h-4 w-4" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleNlpSubmit(nlpQuery, writingLang)}
+              disabled={nlpLoading || !nlpQuery.trim()}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-3 rounded-2xl text-xs sm:text-sm font-extrabold transition-all shadow-md flex items-center space-x-1.5 shrink-0 cursor-pointer"
+            >
+              {nlpLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <span>Get Advisory</span>
+                  <Send className="h-4 w-4 ml-1" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* NLP RESPONSE ADVISORY OUTPUT BOX WITH ALWAYS-VISIBLE FEEDBACK & READ ALOUD */}
+          <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 animate-in fade-in duration-200 ${
+            isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-emerald-200 text-gray-900'
+          }`}>
+            <div className="flex items-center justify-between border-b pb-2 border-emerald-100">
+              <span className="text-xs font-black text-emerald-600 uppercase flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-emerald-500 animate-pulse" />
+                <span>REAL-TIME HYPERLOCAL ADVISORY OUTPUT</span>
+              </span>
+
+              {/* READ ALOUD & STOP READING BUTTONS */}
+              {nlpResponse && !nlpLoading && (
+                <div className="flex items-center space-x-2">
+                  {isSpeaking ? (
+                    <button
+                      type="button"
+                      onClick={handleStopReading}
+                      className="bg-red-500 hover:bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-2xs flex items-center space-x-1 transition-colors cursor-pointer"
+                    >
+                      <VolumeX className="h-3.5 w-3.5" />
+                      <span>Stop Reading</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleReadAloud(nlpResponse)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-2xs flex items-center space-x-1 transition-colors cursor-pointer"
+                    >
+                      <Volume2 className="h-3.5 w-3.5" />
+                      <span>🔊 Read Aloud</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* LIVE LOADING STATE VS FORMATTED ADVISORY TEXT */}
+            {nlpLoading ? (
+              <div className="py-6 flex flex-col items-center justify-center space-y-3 text-emerald-700">
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                <p className="text-xs font-bold animate-pulse text-center">
+                  ⚡ Analyzing soil NPK, weather forecast, mandi prices & pest datasets for {location}...
+                </p>
+              </div>
+            ) : (
+              <div className="text-xs sm:text-sm font-medium leading-relaxed whitespace-pre-wrap">
+                {nlpResponse || "🌾 Namaste! Ask any farm question above and click 'Get Advisory' to get real-time advice!"}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* FULL-WIDTH FINANCIAL HEALTH DISTRESS CARD (WITH SPECTRUM RANGE SCALE) */}
         <div>
           <CreditScoreGauge
-            score={farmerFinancial.loan_distress_score}
-            category={farmerFinancial.distress_category}
+            score={farmerFinancial.loandistressscore}
+            category={farmerFinancial.distresscategory}
             hasLoan={loanProfile.has_loan}
             loanProfile={loanProfile}
             onEditLoan={() => setIsLoanModalOpen(true)}
@@ -721,108 +981,74 @@ const FarmerDashboard = () => {
           />
         </div>
 
-        {/* Location Status Notice Banner */}
-        <div className={`flex items-center justify-between border rounded-xl px-4 py-2 text-xs font-semibold ${isDarkMode ? 'bg-blue-950/60 border-blue-800 text-blue-200' : 'bg-blue-50/80 border-blue-200 text-blue-900'}`}>
-          <span className="flex items-center">
-            <LocateFixed className={`h-4 w-4 mr-2 text-blue-500 ${isLocating ? 'animate-spin' : ''}`} />
-            {locationNotice}
-          </span>
-          <button 
-            onClick={requestBrowserLocation}
-            className="text-[11px] font-extrabold bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg transition-all shadow-2xs shrink-0"
-          >
-            {isLocating ? 'Detecting GPS...' : '📍 Request Location Access'}
-          </button>
-        </div>
-
-        {/* Controls: Location, Season & Land Area */}
-        <div className={`grid grid-cols-1 sm:grid-cols-3 gap-4 p-4.5 rounded-2xl border transition-colors duration-300 ${isDarkMode ? 'bg-slate-800/80 border-slate-700 text-slate-100' : 'bg-gray-50/90 border-gray-200 text-gray-900'}`}>
-          
-          {/* District Selector */}
-          <div className="relative" ref={locationRef}>
-            <label className={`block text-xs font-bold uppercase mb-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>📍 {t('district_location')}</label>
-            <div 
-              className={`flex items-center justify-between border rounded-xl px-3.5 py-2.5 text-sm font-semibold cursor-pointer hover:border-green-500 transition-colors shadow-2xs ${isDarkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-gray-800 border-gray-300'}`}
-              onClick={() => { setShowLocationSelect(!showLocationSelect); setSearchQuery(''); }}
+                                {/* Controls: Location, Season & Land Area */}
+        <div className={`p-4.5 rounded-2xl border transition-colors duration-300 ${isDarkMode ? 'bg-slate-800/80 border-slate-700 text-slate-100' : 'bg-gray-50/90 border-gray-200 text-gray-900'}`}>
+          <div className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 mb-4 rounded-xl border ${isDarkMode ? 'bg-slate-900 border-slate-600' : 'bg-white border-gray-200'} shadow-sm`}>
+            <div className="flex items-center text-sm font-bold mb-2 sm:mb-0">
+              <MapPin className="h-4 w-4 mr-2 text-red-500 shrink-0" />
+              <span className={`mr-2 uppercase tracking-wide text-xs ${isDarkMode ? 'text-slate-300' : 'text-gray-500'}`}>Farm Location:</span>
+              <span className={`text-base tracking-tight ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>{location}</span>
+            </div>
+            <button 
+              onClick={() => setIsMapModalOpen(true)}
+              className="text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors border border-emerald-200 hover:border-emerald-300"
             >
-              <div className="flex items-center truncate">
-                <MapPin className="h-4 w-4 text-red-500 mr-2 shrink-0" />
-                <span className="truncate">{location}</span>
-                {gpsActive && (
-                  <span className="ml-2 text-[9px] bg-green-100 text-green-800 font-extrabold px-1.5 py-0.5 rounded">GPS</span>
-                )}
-              </div>
-              <ChevronDown className={`h-4 w-4 text-gray-400 shrink-0 transition-transform ${showLocationSelect ? 'rotate-180' : ''}`} />
+              Change Location
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Season Selector */}
+            <div>
+              <label className={`flex items-center text-xs font-bold uppercase mb-1.5 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                <Calendar className="h-3.5 w-3.5 mr-1.5 text-amber-500" />
+                {t('farming_season')}
+              </label>
+              <select 
+                value={season}
+                onChange={(e) => {
+                  setSeason(e.target.value);
+                  runFullPipeline(location, e.target.value, areaHa, loanProfile);
+                }}
+                className={`w-full border rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-green-500 outline-none shadow-2xs ${isDarkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-gray-800 border-gray-300'}`}
+              >
+                <option value="Kharif Monsoon">Kharif (Monsoon)</option>
+                <option value="Rabi Winter">Rabi (Winter)</option>
+                <option value="Zaid Summer">Zaid (Summer)</option>
+              </select>
             </div>
 
-            {showLocationSelect && (
-              <div className={`absolute top-full left-0 mt-1 w-64 rounded-2xl shadow-2xl border z-50 overflow-hidden ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>
-                <div className={`p-2 border-b ${isDarkMode ? 'border-slate-700 bg-slate-900' : 'border-gray-100 bg-gray-50'}`}>
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-                    <input
-                      type="text"
-                      className={`w-full pl-9 pr-3 py-1.5 border rounded-lg text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white focus:ring-green-500' : 'bg-white border-gray-200 text-gray-800 focus:ring-green-500'}`}
-                      placeholder={t('search_district_placeholder')}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </div>
+            {/* Land Area Input */}
+            <div>
+              <div className={`flex justify-between items-center text-xs font-bold uppercase mb-1.5 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                  <span className="flex items-center">
+                    <Ruler className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
+                    {t('land_area')}
+                  </span>
+                  <select
+                    value={landUnit}
+                    onChange={(e) => {
+                      const newUnit = e.target.value;
+                      setLandUnit(newUnit);
+                      localStorage.setItem('smartCropLandUnit', newUnit);
+                      runFullPipeline(location, season, newUnit === 'Acres' ? displayArea * 0.404686 : displayArea, loanProfile);
+                    }}
+                    className={`ml-2 text-[10px] bg-transparent font-extrabold cursor-pointer outline-none ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}
+                  >
+                    <option value="Hectares" className="text-gray-900">Hectares</option>
+                    <option value="Acres" className="text-gray-900">Acres</option>
+                  </select>
                 </div>
-                <div className="max-h-48 overflow-y-auto p-1.5 space-y-0.5">
-                  {filteredDistricts.length > 0 ? (
-                    filteredDistricts.map(dist => (
-                      <div
-                        key={dist}
-                        onClick={() => handleSelectDistrict(dist)}
-                        className={`px-3 py-2 text-xs font-semibold rounded-lg flex items-center justify-between cursor-pointer ${
-                          location === dist 
-                            ? 'bg-emerald-600 text-white' 
-                            : isDarkMode ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-green-50 text-gray-700'
-                        }`}
-                      >
-                        <span>{dist}</span>
-                        {location === dist && <span className="text-[10px] uppercase tracking-wider font-extrabold">{t('selected')}</span>}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="px-3 py-2 text-xs text-gray-400 text-center font-medium">{t('no_districts_found')}</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Season Selector */}
-          <div>
-            <label className={`block text-xs font-bold uppercase mb-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>🗓️ {t('farming_season')}</label>
-            <select 
-              value={season} 
-              onChange={(e) => {
-                setSeason(e.target.value);
-                runFullPipeline(location, e.target.value, areaHa, loanProfile);
-              }}
-              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-green-500 outline-none shadow-2xs cursor-pointer ${isDarkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-gray-800 border-gray-300'}`}
-            >
-              <option value="Kharif">{t('kharif_monsoon')}</option>
-              <option value="Rabi">{t('rabi_winter')}</option>
-              <option value="Summer">{t('summer')}</option>
-            </select>
-          </div>
-
-          {/* Land Area Input */}
-          <div>
-            <label className={`block text-xs font-bold uppercase mb-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>📐 {t('land_area')}</label>
-            <input 
-              type="number"
-              step="0.1"
-              min="0.1"
-              value={areaHa}
-              onChange={(e) => setAreaHa(parseFloat(e.target.value) || 1.0)}
-              onBlur={() => runFullPipeline(location, season, areaHa, loanProfile)}
-              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-green-500 outline-none shadow-2xs ${isDarkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-gray-800 border-gray-300'}`}
-            />
+              <input 
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={displayArea}
+                onChange={(e) => { setDisplayArea(parseFloat(e.target.value) || 1.0); localStorage.setItem('smartCropDisplayArea', e.target.value); }}
+                onBlur={() => runFullPipeline(location, season, areaHa, loanProfile)}
+                className={`w-full border rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-green-500 outline-none shadow-2xs ${isDarkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-gray-800 border-gray-300'}`}
+              />
+            </div>
           </div>
         </div>
 
@@ -851,7 +1077,7 @@ const FarmerDashboard = () => {
               <span className="text-lg font-black text-emerald-500">{soilProfile.K} <xs className="text-[10px]">kg/ha</xs></span>
             </div>
             <div className={`p-3 rounded-lg border shadow-2xs ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-emerald-100'}`}>
-              <span className="block text-[10px] font-bold text-gray-400 uppercase">{t('soil_ph')}</span>
+              <span className="block text-[10px] font-bold text-gray-400 uppercase">{t('soilph')}</span>
               <span className="text-lg font-black text-emerald-500">{soilProfile.pH}</span>
             </div>
           </div>
@@ -861,7 +1087,7 @@ const FarmerDashboard = () => {
         {loading ? (
           <div className="py-12 flex flex-col items-center justify-center space-y-3">
             <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-sm font-bold text-gray-500">{t('analyzing_farm_data')}</p>
+            <p className="text-sm font-bold text-gray-500">{t('analyzingfarmdata')}</p>
           </div>
         ) : analysisData ? (
           <div className="space-y-6 animate-in fade-in duration-300">
@@ -872,7 +1098,7 @@ const FarmerDashboard = () => {
                 <div>
                   <div className="flex items-center space-x-2">
                     <span className="bg-emerald-600 text-white font-extrabold text-[11px] px-3 py-1 rounded-full uppercase tracking-wider shadow-2xs">
-                      🏆 {t('top_recommended_crop')}
+                      {t('top_recommended_crop')}
                     </span>
                     <span className="bg-emerald-100 text-emerald-800 font-bold text-xs px-2.5 py-1 rounded-full">
                       {location} • {season}
@@ -886,7 +1112,7 @@ const FarmerDashboard = () => {
                 <div className={`text-left sm:text-right p-3.5 rounded-2xl border shadow-2xs ${
                   isDarkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-emerald-100 text-gray-900'
                 }`}>
-                  <span className={`block text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>{t('current_mandi_price')}</span>
+                  <span className={`block text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>{t('currentmandiprice')}</span>
                   <span className={`text-2xl font-black ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>₹{basePrice.toLocaleString('en-IN')} <xs className={`text-xs font-semibold ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>/qtl</xs></span>
                 </div>
               </div>
@@ -894,23 +1120,23 @@ const FarmerDashboard = () => {
               {/* Crop Analysis Stats Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-5">
                 <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-emerald-100'}`}>
-                  <span className={`block text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>{t('expected_yield')}</span>
+                  <span className={`block text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>{t('expectedyield')}</span>
                   <span className={`text-lg font-extrabold ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{analysisData.crop_recommendation?.yield_per_ha || 3.65} t/ha</span>
                   <span className={`block text-[10px] font-medium mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-gray-400'}`}>Total ~{((analysisData.crop_recommendation?.yield_per_ha || 3.65) * areaHa).toFixed(1)} Tons</span>
                 </div>
                 <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-emerald-100'}`}>
                   <span className={`block text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>{t('expected_net_profit')}</span>
-                  <span className={`text-lg font-extrabold ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{formatIndianCurrency(analysisData.profit_analysis?.net_profit_inr || ((3.65 * areaHa * 23000) - (75000 * areaHa)))}</span>
-                  <span className={`block text-[10px] font-medium mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-gray-400'}`}>{areaHa} Ha Total Land</span>
+                  <span className={`text-lg font-extrabold ${isDarkMode ? ((analysisData.profit_analysis?.net_profit_inr || 1) >= 0 ? "text-emerald-400" : "text-red-400") : ((analysisData.profit_analysis?.net_profit_inr || 1) >= 0 ? "text-emerald-600" : "text-red-600")}`}>{formatIndianCurrency(analysisData.profit_analysis?.net_profit_inr || ((3.65 * areaHa * 23000) - (75000 * areaHa)))}</span>
+                  <span className={`block text-[10px] font-medium mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-gray-400'}`}>{displayArea} {landUnit === 'Acres' ? 'Acres' : 'Ha'} Total Land</span>
                 </div>
                 <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-emerald-100'}`}>
                   <span className={`block text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>{t('cultivation_cost')}</span>
                   <span className={`text-lg font-extrabold ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>{formatIndianCurrency(75000 * areaHa)}</span>
-                  <span className={`block text-[10px] font-medium mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-gray-400'}`}>₹75,000 / ha</span>
+                  <span className={`block text-[10px] font-medium mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-gray-400'}`}>{landUnit === 'Acres' ? '₹30,351 / acre' : '₹75,000 / ha'}</span>
                 </div>
                 <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-emerald-100'}`}>
                   <span className={`block text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>{t('profit_margin')}</span>
-                  <span className={`text-lg font-extrabold ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>+{analysisData.profit_analysis?.roi_percent || 19.1}%</span>
+                  <span className={`text-lg font-extrabold ${isDarkMode ? ((analysisData.profit_analysis?.roi_percent || 19.1) >= 0 ? "text-emerald-400" : "text-red-400") : ((analysisData.profit_analysis?.roi_percent || 19.1) >= 0 ? "text-emerald-600" : "text-red-600")}`}>{(analysisData.profit_analysis?.roi_percent || 19.1) > 0 ? "+" : ""}{analysisData.profit_analysis?.roi_percent || 19.1}%</span>
                   <span className={`block text-[10px] font-medium mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-gray-400'}`}>Return on Investment</span>
                 </div>
               </div>
@@ -936,14 +1162,14 @@ const FarmerDashboard = () => {
               <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
                 <h3 className={`text-sm font-extrabold uppercase tracking-wider mb-3.5 flex items-center ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                   <Award className="h-4 w-4 text-emerald-500 mr-2" />
-                  {t('risk_balanced_candidate_crops_comparison')}
+                  {t('riskbalancedcandidatecropscomparison')}
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className={`border-b text-[10px] uppercase font-bold ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
                         <th className="p-3">{t('crop')}</th>
-                        <th className="p-3">{t('agronomic_fit')}</th>
+                        <th className="p-3">{t('agronomicfit')}</th>
                         <th className="p-3">{t('expected_net_profit')}</th>
                         <th className="p-3">{t('cultivation_cost')}</th>
                         <th className="p-3">{t('safety_score')}</th>
@@ -962,12 +1188,12 @@ const FarmerDashboard = () => {
                               {locCrop}
                               {isRecommended && (
                                 <span className="ml-2 bg-emerald-600 text-white text-[9px] px-2 py-0.5 rounded-full uppercase font-black">
-                                  {t('top_pick')}
+                                  {t('toppick')}
                                 </span>
                               )}
                             </td>
                             <td className={`p-3 font-extrabold ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>{c.suitability_score}%</td>
-                            <td className={`p-3 font-extrabold ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>{formatIndianCurrency(c.expected_net_profit, true)}</td>
+                            <td className={`p-3 font-extrabold ${isDarkMode ? (c.expected_net_profit >= 0 ? "text-emerald-400" : "text-red-400") : (c.expected_net_profit >= 0 ? "text-emerald-700" : "text-red-700")}`}>{formatIndianCurrency(c.expected_net_profit, true)}</td>
                             <td className={`p-3 ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>{formatIndianCurrency(c.total_cultivation_cost, true)}</td>
                             <td className="p-3">
                               <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
@@ -1017,17 +1243,17 @@ const FarmerDashboard = () => {
                   <span className="block text-[9px] text-slate-400 font-extrabold mt-0.5">Base Rate</span>
                 </div>
                 <div className="p-3.5 rounded-2xl border bg-emerald-900/90 text-emerald-100 border-emerald-700 shadow-md">
-                  <span className="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider">{t('15_day_forecast')}</span>
+                  <span className="block text-[10px] font-bold text-emerald-300 uppercase tracking-wider">{t('next_15_days') || '15 Day Forecast'}</span>
                   <span className="text-lg font-black text-white">₹{priceForecast.price15.toLocaleString('en-IN')}</span>
                   <span className="block text-[9px] text-emerald-300 font-extrabold mt-0.5">+3.8% Gain</span>
                 </div>
                 <div className="p-3.5 rounded-2xl border bg-emerald-800 text-white border-emerald-600 shadow-lg ring-1 ring-emerald-500/40">
-                  <span className="block text-[10px] font-bold text-emerald-200 uppercase tracking-wider">{t('30_day_forecast')}</span>
+                  <span className="block text-[10px] font-bold text-emerald-200 uppercase tracking-wider">{t('next_30_days') || '30 Day Forecast'}</span>
                   <span className="text-lg font-black text-white">₹{priceForecast.price30.toLocaleString('en-IN')}</span>
                   <span className="block text-[9px] text-amber-300 font-extrabold mt-0.5">+7.5% Gain</span>
                 </div>
                 <div className="p-3.5 rounded-2xl border bg-teal-900/90 text-teal-100 border-teal-700 shadow-md">
-                  <span className="block text-[10px] font-bold text-teal-300 uppercase tracking-wider">{t('90_day_forecast')}</span>
+                  <span className="block text-[10px] font-bold text-teal-300 uppercase tracking-wider">{t('next_90_days') || '90 Day Forecast'}</span>
                   <span className="text-lg font-black text-white">₹{priceForecast.price90.toLocaleString('en-IN')}</span>
                   <span className="block text-[9px] text-teal-300 font-extrabold mt-0.5">+13.4% Peak</span>
                 </div>
@@ -1041,7 +1267,7 @@ const FarmerDashboard = () => {
             <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
               <h3 className={`text-sm font-extrabold uppercase tracking-wider mb-3 flex items-center ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
                 <DollarSign className="h-4 w-4 text-emerald-500 mr-2" />
-                {t('estimated_financial_returns_breakdown')} ({areaHa} Ha Land)
+                {t('cultivation_cost_net_profit_estimate') || 'Estimated Financial Returns Breakdown'} ({displayArea} {landUnit === 'Acres' ? 'Acres' : 'Ha'} Land)
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-xs font-semibold">
@@ -1058,13 +1284,9 @@ const FarmerDashboard = () => {
               <div className={`p-3.5 rounded-xl border flex justify-between items-center ${isDarkMode ? 'bg-slate-900 border-emerald-500/40' : 'bg-white border-emerald-300'}`}>
                 <div>
                   <span className={`block text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>{t('expected_net_profit')}</span>
-                  <span className={`text-2xl font-black ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                    {formatIndianCurrency(analysisData.profit_analysis?.net_profit_inr || ((3.65 * areaHa * 23000) - (75000 * areaHa)))}
-                  </span>
+                  <span className={`text-2xl font-black ${isDarkMode ? ((analysisData.profit_analysis?.net_profit_inr || 1) >= 0 ? "text-emerald-400" : "text-red-400") : ((analysisData.profit_analysis?.net_profit_inr || 1) >= 0 ? "text-emerald-600" : "text-red-600")}`}>{formatIndianCurrency(analysisData.profit_analysis?.net_profit_inr || ((3.65 * areaHa * 23000) - (75000 * areaHa)))}</span>
                 </div>
-                <span className="bg-emerald-700 text-white font-black text-sm px-4 py-1.5 rounded-full shadow-xs">
-                  +{analysisData.profit_analysis?.roi_percent || 19.1}% {t('roi')}
-                </span>
+                <span className={`${(analysisData.profit_analysis?.roi_percent || 19.1) >= 0 ? "bg-emerald-700" : "bg-red-700"} text-white font-black text-sm px-4 py-1.5 rounded-full shadow-xs`}>{(analysisData.profit_analysis?.roi_percent || 19.1) > 0 ? "+" : ""}{analysisData.profit_analysis?.roi_percent || 19.1}% {t("roi")}</span>
               </div>
             </div>
 
@@ -1084,66 +1306,7 @@ const FarmerDashboard = () => {
           <Volume2 className={`h-4.5 w-4.5 ${playing ? 'animate-pulse text-yellow-300' : 'text-white'}`} />
           <span>{playing ? t('stop_audio') : t('listen_to_advisory')}</span>
         </button>
-
-        {/* Standard-Sized Button Bar with Popping-Out 3X Bot Logo Avatar */}
-        <button
-          onClick={() => setIsAssistantOpen(true)}
-          className="relative flex items-center space-x-2.5 bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-700 text-white pl-2 pr-5 py-2.5 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all border border-emerald-400 overflow-visible"
-          title={t('smart_assistant')}
-        >
-          <img 
-            src={smartBotImg} 
-            alt="Smart AI Bot" 
-            className="w-16 h-16 sm:w-18 sm:h-18 object-contain drop-shadow-xl shrink-0 -my-4 -ml-2 transition-transform hover:scale-110" 
-          />
-          <span className="font-black text-sm sm:text-base tracking-wide">{t('smart_assistant')}</span>
-        </button>
       </div>
-
-      {/* EXPANDED CENTERED GLASS-BLURRY SMART ASSISTANT MODAL WINDOW */}
-      {isAssistantOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
-          <div className={`w-full max-w-4xl h-[85vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 ${
-            isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white/95 backdrop-blur-xl border-white/50 text-gray-900'
-          }`}>
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-emerald-200/60 bg-emerald-700 text-white shadow-xs">
-              <div className="flex items-center space-x-4">
-                <div className="p-1 bg-white/20 rounded-2xl backdrop-blur-md">
-                  <img 
-                    src={smartBotImg} 
-                    alt="Smart AI Bot Avatar" 
-                    className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-md" 
-                  />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-lg sm:text-xl flex items-center gap-2">
-                    {t('chat_title')}
-                    <span className="text-[10px] bg-emerald-400/30 text-emerald-100 px-2.5 py-0.5 rounded-full font-bold border border-emerald-300/40">
-                      Official Advisory
-                    </span>
-                  </h3>
-                  <p className="text-xs text-emerald-100">{t('chat_subtitle')}</p>
-                </div>
-              </div>
-
-              <button 
-                onClick={() => setIsAssistantOpen(false)}
-                className="text-white/80 hover:text-white p-2 rounded-xl hover:bg-white/20 transition-colors cursor-pointer"
-                title="Close Assistant"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            {/* Embedded Chat Area taking full modal height */}
-            <div className={`flex-1 overflow-hidden p-2 ${isDarkMode ? 'bg-slate-950' : 'bg-gray-50/50'}`}>
-              <FarmerChat isEmbedded={true} isDarkMode={isDarkMode} />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Loan Profile Modal */}
       <LoanInformationModal
@@ -1300,8 +1463,33 @@ const FarmerDashboard = () => {
               >
                 Got It, Close
               </button>
-            </div>
+            </div>          </div>
+        </div>
+      )}
 
+      {/* Map Modal */}
+      {isMapModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className={`w-full max-w-md rounded-2xl shadow-2xl p-6 ${isDarkMode ? "bg-slate-900 border border-slate-700" : "bg-white"}`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className={`text-lg font-black flex items-center ${isDarkMode ? "text-emerald-400" : "text-emerald-700"}`}>
+                <MapPin className="h-5 w-5 mr-2 text-red-500" /> Select Farm Location
+              </h3>
+              <button onClick={() => setIsMapModalOpen(false)} className={`p-1 rounded-full ${isDarkMode ? "hover:bg-slate-800 text-slate-400" : "hover:bg-gray-100 text-gray-500"}`}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="h-[350px] w-full rounded-xl overflow-hidden border border-emerald-100">
+              <LocationPickerMap 
+                initialDistrict={location} 
+                onLocationSelect={(dist) => {
+                  setLocation(dist);
+                  localStorage.setItem("smartCropLocation", dist);
+                  setIsMapModalOpen(false);
+                  runFullPipeline(dist, season, areaHa, loanProfile);
+                }} 
+              />
+            </div>
           </div>
         </div>
       )}
@@ -1310,3 +1498,19 @@ const FarmerDashboard = () => {
 };
 
 export default FarmerDashboard;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

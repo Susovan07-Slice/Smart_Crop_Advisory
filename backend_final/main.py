@@ -61,8 +61,12 @@ if os.path.exists(frontend_dist):
         file_path = os.path.join(frontend_dist, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
+
         return FileResponse(os.path.join(frontend_dist, "index.html"))
 else:
     @app.get("/")
     def read_root():
         return {"message": "Welcome to SmartCrop Unified Master AI API"}
+
+
+

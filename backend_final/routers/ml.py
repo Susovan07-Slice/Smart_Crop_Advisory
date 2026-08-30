@@ -103,6 +103,8 @@ def run_full_farm_analysis(payload: FullFarmAnalysisPayload):
 
         return analysis_result
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/production-prediction", response_model=ProductionPredictionResponse)

@@ -18,13 +18,22 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, l
         barColor: "bg-emerald-500",
         message: t('good_position_msg'),
         loanBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.outstanding_principal || 50000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 10,
-        loanBurdenLevel: hasLoan ? (loanProfile.outstanding_principal > 100000 ? t('level_moderate') : t('level_low')) : t('level_low'),
+        get loanBurdenLevel() {
+          if (!hasLoan) return t('level_low');
+          return this.loanBurdenPct >= 70 ? t('level_high') : (this.loanBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
+        },
         interestBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.annual_interest_rate || 7) / 18) * 100)) : 10,
-        interestBurdenLevel: t('level_low'),
+        get interestBurdenLevel() {
+          if (!hasLoan) return t('level_low');
+          return this.interestBurdenPct >= 70 ? t('level_high') : (this.interestBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
+        },
         incomeRiskPct: 25,
         incomeRiskLevel: t('level_low'),
         repaymentPct: hasLoan ? Math.min(100, Math.round(((loanProfile.total_amount_repaid || 30000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 90,
-        repaymentLevel: t('level_good')
+        get repaymentLevel() {
+          if (!hasLoan) return t('level_good');
+          return this.repaymentPct >= 50 ? t('level_good') : (this.repaymentPct >= 20 ? t('level_fair') : t('level_critical'));
+        }
       };
     } else if (dScore <= 65) {
       return {
@@ -33,14 +42,23 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, l
         scoreColor: isDarkMode ? "text-amber-400" : "text-amber-600",
         barColor: "bg-amber-500",
         message: t('moderate_position_msg'),
-        loanBurdenPct: 55,
-        loanBurdenLevel: t('level_moderate'),
-        interestBurdenPct: 50,
-        interestBurdenLevel: t('level_moderate'),
+        loanBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.outstanding_principal || 50000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 55,
+        get loanBurdenLevel() {
+          if (!hasLoan) return t('level_moderate');
+          return this.loanBurdenPct >= 70 ? t('level_high') : (this.loanBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
+        },
+        interestBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.annual_interest_rate || 7) / 18) * 100)) : 50,
+        get interestBurdenLevel() {
+          if (!hasLoan) return t('level_moderate');
+          return this.interestBurdenPct >= 70 ? t('level_high') : (this.interestBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
+        },
         incomeRiskPct: 55,
         incomeRiskLevel: t('level_moderate'),
-        repaymentPct: 50,
-        repaymentLevel: t('level_fair')
+        repaymentPct: hasLoan ? Math.min(100, Math.round(((loanProfile.total_amount_repaid || 30000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 50,
+        get repaymentLevel() {
+          if (!hasLoan) return t('level_fair');
+          return this.repaymentPct >= 50 ? t('level_good') : (this.repaymentPct >= 20 ? t('level_fair') : t('level_critical'));
+        }
       };
     } else {
       return {
@@ -49,14 +67,23 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, l
         scoreColor: isDarkMode ? "text-rose-400" : "text-red-600",
         barColor: "bg-red-500",
         message: t('high_position_msg'),
-        loanBurdenPct: 85,
-        loanBurdenLevel: t('level_high'),
-        interestBurdenPct: 80,
-        interestBurdenLevel: t('level_high'),
+        loanBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.outstanding_principal || 50000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 85,
+        get loanBurdenLevel() {
+          if (!hasLoan) return t('level_high');
+          return this.loanBurdenPct >= 70 ? t('level_high') : (this.loanBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
+        },
+        interestBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.annual_interest_rate || 7) / 18) * 100)) : 80,
+        get interestBurdenLevel() {
+          if (!hasLoan) return t('level_high');
+          return this.interestBurdenPct >= 70 ? t('level_high') : (this.interestBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
+        },
         incomeRiskPct: 80,
         incomeRiskLevel: t('level_high'),
-        repaymentPct: 25,
-        repaymentLevel: t('level_critical')
+        repaymentPct: hasLoan ? Math.min(100, Math.round(((loanProfile.total_amount_repaid || 30000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 25,
+        get repaymentLevel() {
+          if (!hasLoan) return t('level_critical');
+          return this.repaymentPct >= 50 ? t('level_good') : (this.repaymentPct >= 20 ? t('level_fair') : t('level_critical'));
+        }
       };
     }
   };
@@ -126,12 +153,12 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, l
             isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
           }`}>
             <div 
-              className={`h-full rounded-full transition-all duration-500 ${theme.barColor}`} 
+              className={`h-full rounded-full transition-all duration-500 ${theme.loanBurdenPct >= 70 ? 'bg-red-500' : (theme.loanBurdenPct >= 40 ? 'bg-amber-500' : 'bg-emerald-500')}`} 
               style={{ width: `${theme.loanBurdenPct}%` }}
             />
           </div>
 
-          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>
+          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${theme.loanBurdenPct >= 70 ? 'text-red-500' : (theme.loanBurdenPct >= 40 ? 'text-amber-500' : 'text-emerald-500')}`}>
             {theme.loanBurdenLevel}
           </span>
         </div>
@@ -149,12 +176,12 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, l
             isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
           }`}>
             <div 
-              className={`h-full rounded-full transition-all duration-500 ${theme.barColor}`} 
+              className={`h-full rounded-full transition-all duration-500 ${theme.interestBurdenPct >= 70 ? 'bg-red-500' : (theme.interestBurdenPct >= 40 ? 'bg-amber-500' : 'bg-emerald-500')}`} 
               style={{ width: `${theme.interestBurdenPct}%` }}
             />
           </div>
 
-          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>
+          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${theme.interestBurdenPct >= 70 ? 'text-red-500' : (theme.interestBurdenPct >= 40 ? 'text-amber-500' : 'text-emerald-500')}`}>
             {theme.interestBurdenLevel}
           </span>
         </div>
@@ -172,12 +199,12 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, l
             isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
           }`}>
             <div 
-              className="h-full bg-amber-500 rounded-full transition-all duration-500" 
+              className={`h-full rounded-full transition-all duration-500 ${theme.incomeRiskPct >= 70 ? 'bg-red-500' : (theme.incomeRiskPct >= 40 ? 'bg-amber-500' : 'bg-emerald-500')}`} 
               style={{ width: `${theme.incomeRiskPct}%` }}
             />
           </div>
 
-          <span className="text-[11px] font-extrabold text-amber-500 w-16 text-right shrink-0">
+          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${theme.incomeRiskPct >= 70 ? 'text-red-500' : (theme.incomeRiskPct >= 40 ? 'text-amber-500' : 'text-emerald-500')}`}>
             {theme.incomeRiskLevel}
           </span>
         </div>
@@ -195,12 +222,12 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, l
             isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
           }`}>
             <div 
-              className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
+              className={`h-full rounded-full transition-all duration-500 ${theme.repaymentPct >= 50 ? 'bg-emerald-500' : (theme.repaymentPct >= 20 ? 'bg-amber-500' : 'bg-red-500')}`} 
               style={{ width: `${theme.repaymentPct}%` }}
             />
           </div>
 
-          <span className="text-[11px] font-extrabold text-emerald-500 w-16 text-right shrink-0">
+          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${theme.repaymentPct >= 50 ? 'text-emerald-500' : (theme.repaymentPct >= 20 ? 'text-amber-500' : 'text-red-500')}`}>
             {theme.repaymentLevel}
           </span>
         </div>

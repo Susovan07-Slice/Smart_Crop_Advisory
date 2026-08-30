@@ -28,7 +28,14 @@ export const LanguageProvider = ({ children }) => {
   }, []);
 
   const t = (key) => {
-    return translations[lang]?.[key] || translations['en'][key] || key;
+    const translation = translations[lang]?.[key] || translations['en'][key];
+    if (translation) return translation;
+    
+    // Fallback: If translation is missing, format the snake_case key to "Word Word"
+    if (typeof key === 'string') {
+      return key.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+    }
+    return key;
   };
 
   return (

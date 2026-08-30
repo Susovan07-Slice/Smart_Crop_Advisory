@@ -157,20 +157,6 @@ function NavigationBar() {
               </select>
             </div>
 
-            {/* Smart Assistant Button — Compact Bar with Popping-Out Bot Logo */}
-            <button
-              onClick={handleTriggerChat}
-              className="relative flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white pl-1.5 pr-3.5 py-1 rounded-xl text-xs font-extrabold shadow-md transition-all border border-emerald-500 hover:scale-105 overflow-visible cursor-pointer"
-              title={t('smart_assistant')}
-            >
-              <img 
-                src={smartBotImg} 
-                alt="Smart Assistant Bot" 
-                className="w-10 h-10 object-contain drop-shadow-md shrink-0 -my-2 -ml-1" 
-              />
-              <span className="hidden sm:inline">{t('smart_assistant')}</span>
-            </button>
-
             {/* Home Link */}
             <a 
               href="/" 
@@ -227,16 +213,9 @@ function NavigationBar() {
 
                       {loanProfile.has_loan ? (
                         <div className="space-y-1 text-xs">
-                          <div className="flex justify-between items-center text-gray-700">
-                            <span className="text-[11px] font-medium">{t('original_loan_label')}:</span>
-                            <span className="font-bold text-gray-900">₹{(loanProfile.original_loan_amount || 100000).toLocaleString('en-IN')}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-gray-700">
-                            <span className="text-[11px] font-medium">{t('amount_repaid_label')}:</span>
-                            <span className="font-bold text-emerald-700">₹{(loanProfile.total_amount_repaid || 30000).toLocaleString('en-IN')}</span>
-                          </div>
+                          <div className="flex justify-between items-center text-gray-700"><span className="text-[11px] font-medium">{t("annual_interest_rate") || "Interest Rate"}:</span><span className="font-bold text-amber-600">{(loanProfile.annual_interest_rate || 8.5)}%</span></div><div className="flex justify-between items-center text-gray-700"><span className="text-[11px] font-medium">{t("loan_due_date") || "Due Date"}:</span><span className="font-bold text-gray-900">{loanProfile.loan_due_date || "2027-09-15"}</span></div>
                           <div className="flex justify-between items-center pt-1 border-t border-amber-200/80">
-                            <span className="text-[11px] font-black text-amber-950">{t('outstanding_to_pay')}:</span>
+                            <span className="text-[11px] font-black text-amber-950">{t("outstanding_principal") || "Outstanding Principal"}:</span>
                             <span className="text-sm font-black text-red-600">
                               ₹{(loanProfile.outstanding_principal || 80000).toLocaleString('en-IN')}
                             </span>
@@ -324,3 +303,6 @@ function App() {
 }
 
 export default App;
+
+
+
