@@ -1,0 +1,11 @@
+{
+  "framework": "vite",
+  "buildCommand": "cd SmartCrop-main/SmartCrop-main/frontend && npm install && npm run build",
+  "outputDirectory": "SmartCrop-main/SmartCrop-main/frontend/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
