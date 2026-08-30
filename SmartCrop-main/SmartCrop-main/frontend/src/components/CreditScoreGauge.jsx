@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { Sprout, Info, ArrowRight, Wallet, Percent, Wheat, Calculator } from 'lucide-react';
+import { Sprout, Info, ArrowRight, Wallet, CloudRain, Wind, Wheat } from 'lucide-react';
 
 const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, loanProfile = {}, onEditLoan, isDarkMode }) => {
   const { t } = useLanguage();
@@ -10,80 +10,81 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, l
 
   // Determine category theme based on distress score
   const getScoreTheme = (dScore) => {
-    if (dScore <= 35) {
+    if (dScore <= 25) {
       return {
-        badgeText: `${t('very_low')} ${t('financial_distress')}`,
+        badgeText: "VERY LOW DISTRESS",
         badgeClass: isDarkMode ? "bg-emerald-900/70 text-emerald-300 border-emerald-700" : "bg-emerald-100 text-emerald-800 border-emerald-300",
         scoreColor: isDarkMode ? "text-emerald-400" : "text-emerald-600",
         barColor: "bg-emerald-500",
-        message: t('good_position_msg'),
+        message: "Your farm is in a stable overall safety position with minimal risk.",
         loanBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.outstanding_principal || 50000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 10,
         get loanBurdenLevel() {
           if (!hasLoan) return t('level_low');
           return this.loanBurdenPct >= 70 ? t('level_high') : (this.loanBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
         },
-        interestBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.annual_interest_rate || 7) / 18) * 100)) : 10,
-        get interestBurdenLevel() {
-          if (!hasLoan) return t('level_low');
-          return this.interestBurdenPct >= 70 ? t('level_high') : (this.interestBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
-        },
-        incomeRiskPct: 25,
-        incomeRiskLevel: t('level_low'),
-        repaymentPct: hasLoan ? Math.min(100, Math.round(((loanProfile.total_amount_repaid || 30000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 90,
-        get repaymentLevel() {
-          if (!hasLoan) return t('level_good');
-          return this.repaymentPct >= 50 ? t('level_good') : (this.repaymentPct >= 20 ? t('level_fair') : t('level_critical'));
-        }
+        weatherRiskPct: 15,
+        weatherRiskLevel: "Low Deficit",
+        windRiskPct: 12,
+        windRiskLevel: "Normal Wind",
+        cropRiskPct: 20,
+        cropRiskLevel: "Resilient Crop"
       };
-    } else if (dScore <= 65) {
+    } else if (dScore <= 50) {
       return {
-        badgeText: `${t('moderate')} ${t('financial_distress')}`,
+        badgeText: "LOW DISTRESS",
+        badgeClass: isDarkMode ? "bg-emerald-900/50 text-emerald-300 border-emerald-600" : "bg-emerald-50 text-emerald-700 border-emerald-200",
+        scoreColor: isDarkMode ? "text-emerald-400" : "text-emerald-600",
+        barColor: "bg-emerald-500",
+        message: "Minor operational risks detected; maintain balanced soil nutrients and normal field monitoring.",
+        loanBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.outstanding_principal || 50000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 35,
+        get loanBurdenLevel() {
+          if (!hasLoan) return t('level_low');
+          return this.loanBurdenPct >= 70 ? t('level_high') : (this.loanBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
+        },
+        weatherRiskPct: 35,
+        weatherRiskLevel: "Mild Deficit",
+        windRiskPct: 28,
+        windRiskLevel: "Light Breeze",
+        cropRiskPct: 35,
+        cropRiskLevel: "Normal Crop"
+      };
+    } else if (dScore <= 75) {
+      return {
+        badgeText: "MODERATE DISTRESS",
         badgeClass: isDarkMode ? "bg-amber-900/70 text-amber-300 border-amber-700" : "bg-amber-100 text-amber-900 border-amber-300",
         scoreColor: isDarkMode ? "text-amber-400" : "text-amber-600",
         barColor: "bg-amber-500",
-        message: t('moderate_position_msg'),
-        loanBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.outstanding_principal || 50000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 55,
+        message: "Moderate distress alert! Weather fluctuations, wind gusts, or loan interest burden require attention.",
+        loanBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.outstanding_principal || 50000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 58,
         get loanBurdenLevel() {
           if (!hasLoan) return t('level_moderate');
           return this.loanBurdenPct >= 70 ? t('level_high') : (this.loanBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
         },
-        interestBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.annual_interest_rate || 7) / 18) * 100)) : 50,
-        get interestBurdenLevel() {
-          if (!hasLoan) return t('level_moderate');
-          return this.interestBurdenPct >= 70 ? t('level_high') : (this.interestBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
-        },
-        incomeRiskPct: 55,
-        incomeRiskLevel: t('level_moderate'),
-        repaymentPct: hasLoan ? Math.min(100, Math.round(((loanProfile.total_amount_repaid || 30000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 50,
-        get repaymentLevel() {
-          if (!hasLoan) return t('level_fair');
-          return this.repaymentPct >= 50 ? t('level_good') : (this.repaymentPct >= 20 ? t('level_fair') : t('level_critical'));
-        }
+        weatherRiskPct: 60,
+        weatherRiskLevel: "Moderate Deficit",
+        windRiskPct: 52,
+        windRiskLevel: "Breezy/Gusts",
+        cropRiskPct: 58,
+        cropRiskLevel: "Moderate Vuln."
       };
     } else {
       return {
-        badgeText: `${t('high')} ${t('financial_distress')}`,
+        badgeText: "HIGH DISTRESS",
         badgeClass: isDarkMode ? "bg-rose-900/70 text-rose-300 border-rose-700" : "bg-red-100 text-red-800 border-red-300",
         scoreColor: isDarkMode ? "text-rose-400" : "text-red-600",
         barColor: "bg-red-500",
-        message: t('high_position_msg'),
-        loanBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.outstanding_principal || 50000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 85,
+        message: "Critical distress alert! High vulnerability detected across climate threats, storm warnings, or heavy debt burden.",
+        loanBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.outstanding_principal || 50000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 88,
         get loanBurdenLevel() {
           if (!hasLoan) return t('level_high');
           return this.loanBurdenPct >= 70 ? t('level_high') : (this.loanBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
         },
-        interestBurdenPct: hasLoan ? Math.min(100, Math.round(((loanProfile.annual_interest_rate || 7) / 18) * 100)) : 80,
-        get interestBurdenLevel() {
-          if (!hasLoan) return t('level_high');
-          return this.interestBurdenPct >= 70 ? t('level_high') : (this.interestBurdenPct >= 40 ? t('level_moderate') : t('level_low'));
-        },
-        incomeRiskPct: 80,
-        incomeRiskLevel: t('level_high'),
-        repaymentPct: hasLoan ? Math.min(100, Math.round(((loanProfile.total_amount_repaid || 30000) / (loanProfile.original_loan_amount || 100000)) * 100)) : 25,
-        get repaymentLevel() {
-          if (!hasLoan) return t('level_critical');
-          return this.repaymentPct >= 50 ? t('level_good') : (this.repaymentPct >= 20 ? t('level_fair') : t('level_critical'));
-        }
+        weatherRiskPct: 85,
+        weatherRiskLevel: "Severe Deficit",
+        windRiskPct: 82,
+        windRiskLevel: "Storm Warning",
+        cropRiskPct: 88,
+        cropRiskLevel: "High Vuln."
       };
     }
   };
@@ -112,11 +113,11 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, l
             <h3 className={`text-base font-black tracking-tight flex items-center gap-1.5 ${
               isDarkMode ? 'text-white' : 'text-gray-900'
             }`}>
-              FINANCIAL DISTRESS SCORE
-              <Info className={`h-3.5 w-3.5 cursor-pointer ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-400 hover:text-gray-600'}`} title="Financial Distress Score (0-100) calculated from interest burden, loan principal ratio & net farm profit." />
+              FARMER DISTRESS SCORE
+              <Info className={`h-3.5 w-3.5 cursor-pointer ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-400 hover:text-gray-600'}`} title="Composite Farmer Distress Score (0-100) calculated from Loan Debt, Rainfall Deficit, Wind Hazard & Crop Vulnerability." />
             </h3>
             <p className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-              Financial Distress Index (Lower is Better)
+              Composite Distress Index (Lower is Better)
             </p>
           </div>
         </div>
@@ -137,16 +138,16 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, l
         </p>
       </div>
 
-      {/* Right Column: 4 Breakdown Metrics Bars */}
+      {/* Right Column: 4 Multi-Factor Risk Breakdown Metric Scale Bars */}
       <div className="flex-1 flex flex-col justify-between space-y-2.5 pl-0 md:pl-2">
         
-        {/* Metric 1: Loan Burden */}
+        {/* Metric 1: Loan & Debt Burden */}
         <div className="flex items-center justify-between text-xs space-x-3">
-          <div className="flex items-center space-x-2 w-36 shrink-0">
+          <div className="flex items-center space-x-2 w-40 shrink-0">
             <div className={`p-1 rounded-lg ${isDarkMode ? 'bg-slate-700 text-emerald-400' : 'bg-emerald-50 text-emerald-700'}`}>
               <Wallet className="h-3.5 w-3.5" />
             </div>
-            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>{t('loan_burden_label')}</span>
+            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>Loan & Debt Burden</span>
           </div>
 
           <div className={`flex-1 h-2.5 rounded-full overflow-hidden border mx-2 ${
@@ -158,81 +159,81 @@ const CreditScoreGauge = ({ score = 0, category = "Very Low", hasLoan = false, l
             />
           </div>
 
-          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${theme.loanBurdenPct >= 70 ? 'text-red-500' : (theme.loanBurdenPct >= 40 ? 'text-amber-500' : 'text-emerald-500')}`}>
+          <span className={`text-[11px] font-extrabold w-20 text-right shrink-0 ${theme.loanBurdenPct >= 70 ? 'text-red-500' : (theme.loanBurdenPct >= 40 ? 'text-amber-500' : 'text-emerald-500')}`}>
             {theme.loanBurdenLevel}
           </span>
         </div>
 
-        {/* Metric 2: Interest Burden */}
+        {/* Metric 2: Rainfall & Weather Deficit Risk */}
         <div className="flex items-center justify-between text-xs space-x-3">
-          <div className="flex items-center space-x-2 w-36 shrink-0">
-            <div className={`p-1 rounded-lg ${isDarkMode ? 'bg-slate-700 text-emerald-400' : 'bg-emerald-50 text-emerald-700'}`}>
-              <Percent className="h-3.5 w-3.5" />
+          <div className="flex items-center space-x-2 w-40 shrink-0">
+            <div className={`p-1 rounded-lg ${isDarkMode ? 'bg-blue-950 text-blue-400' : 'bg-blue-50 text-blue-700'}`}>
+              <CloudRain className="h-3.5 w-3.5" />
             </div>
-            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>{t('interest_burden_label')}</span>
+            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>Rainfall Deficit Risk</span>
           </div>
 
           <div className={`flex-1 h-2.5 rounded-full overflow-hidden border mx-2 ${
             isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
           }`}>
             <div 
-              className={`h-full rounded-full transition-all duration-500 ${theme.interestBurdenPct >= 70 ? 'bg-red-500' : (theme.interestBurdenPct >= 40 ? 'bg-amber-500' : 'bg-emerald-500')}`} 
-              style={{ width: `${theme.interestBurdenPct}%` }}
+              className={`h-full rounded-full transition-all duration-500 ${theme.weatherRiskPct >= 70 ? 'bg-red-500' : (theme.weatherRiskPct >= 40 ? 'bg-amber-500' : 'bg-emerald-500')}`} 
+              style={{ width: `${theme.weatherRiskPct}%` }}
             />
           </div>
 
-          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${theme.interestBurdenPct >= 70 ? 'text-red-500' : (theme.interestBurdenPct >= 40 ? 'text-amber-500' : 'text-emerald-500')}`}>
-            {theme.interestBurdenLevel}
+          <span className={`text-[11px] font-extrabold w-20 text-right shrink-0 ${theme.weatherRiskPct >= 70 ? 'text-red-500' : (theme.weatherRiskPct >= 40 ? 'text-amber-500' : 'text-emerald-500')}`}>
+            {theme.weatherRiskLevel}
           </span>
         </div>
 
-        {/* Metric 3: Income Risk */}
+        {/* Metric 3: Wind Speed & Disaster Hazard */}
         <div className="flex items-center justify-between text-xs space-x-3">
-          <div className="flex items-center space-x-2 w-36 shrink-0">
+          <div className="flex items-center space-x-2 w-40 shrink-0">
             <div className={`p-1 rounded-lg ${isDarkMode ? 'bg-amber-950 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
+              <Wind className="h-3.5 w-3.5" />
+            </div>
+            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>Wind Hazard Risk</span>
+          </div>
+
+          <div className={`flex-1 h-2.5 rounded-full overflow-hidden border mx-2 ${
+            isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
+          }`}>
+            <div 
+              className={`h-full rounded-full transition-all duration-500 ${theme.windRiskPct >= 70 ? 'bg-red-500' : (theme.windRiskPct >= 40 ? 'bg-amber-500' : 'bg-emerald-500')}`} 
+              style={{ width: `${theme.windRiskPct}%` }}
+            />
+          </div>
+
+          <span className={`text-[11px] font-extrabold w-20 text-right shrink-0 ${theme.windRiskPct >= 70 ? 'text-red-500' : (theme.windRiskPct >= 40 ? 'text-amber-500' : 'text-emerald-500')}`}>
+            {theme.windRiskLevel}
+          </span>
+        </div>
+
+        {/* Metric 4: Crop Vulnerability Risk */}
+        <div className="flex items-center justify-between text-xs space-x-3">
+          <div className="flex items-center space-x-2 w-40 shrink-0">
+            <div className={`p-1 rounded-lg ${isDarkMode ? 'bg-emerald-950 text-emerald-400' : 'bg-emerald-50 text-emerald-700'}`}>
               <Wheat className="h-3.5 w-3.5" />
             </div>
-            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>{t('income_risk_label')}</span>
+            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>Crop Vulnerability Risk</span>
           </div>
 
           <div className={`flex-1 h-2.5 rounded-full overflow-hidden border mx-2 ${
             isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
           }`}>
             <div 
-              className={`h-full rounded-full transition-all duration-500 ${theme.incomeRiskPct >= 70 ? 'bg-red-500' : (theme.incomeRiskPct >= 40 ? 'bg-amber-500' : 'bg-emerald-500')}`} 
-              style={{ width: `${theme.incomeRiskPct}%` }}
+              className={`h-full rounded-full transition-all duration-500 ${theme.cropRiskPct >= 70 ? 'bg-red-500' : (theme.cropRiskPct >= 40 ? 'bg-amber-500' : 'bg-emerald-500')}`} 
+              style={{ width: `${theme.cropRiskPct}%` }}
             />
           </div>
 
-          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${theme.incomeRiskPct >= 70 ? 'text-red-500' : (theme.incomeRiskPct >= 40 ? 'text-amber-500' : 'text-emerald-500')}`}>
-            {theme.incomeRiskLevel}
+          <span className={`text-[11px] font-extrabold w-20 text-right shrink-0 ${theme.cropRiskPct >= 70 ? 'text-red-500' : (theme.cropRiskPct >= 40 ? 'text-amber-500' : 'text-emerald-500')}`}>
+            {theme.cropRiskLevel}
           </span>
         </div>
 
-        {/* Metric 4: Repayment Capacity */}
-        <div className="flex items-center justify-between text-xs space-x-3">
-          <div className="flex items-center space-x-2 w-36 shrink-0">
-            <div className={`p-1 rounded-lg ${isDarkMode ? 'bg-blue-950 text-blue-400' : 'bg-blue-50 text-blue-700'}`}>
-              <Calculator className="h-3.5 w-3.5" />
-            </div>
-            <span className={`font-bold truncate ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>{t('repayment_capacity_label')}</span>
-          </div>
-
-          <div className={`flex-1 h-2.5 rounded-full overflow-hidden border mx-2 ${
-            isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200/60'
-          }`}>
-            <div 
-              className={`h-full rounded-full transition-all duration-500 ${theme.repaymentPct >= 50 ? 'bg-emerald-500' : (theme.repaymentPct >= 20 ? 'bg-amber-500' : 'bg-red-500')}`} 
-              style={{ width: `${theme.repaymentPct}%` }}
-            />
-          </div>
-
-          <span className={`text-[11px] font-extrabold w-16 text-right shrink-0 ${theme.repaymentPct >= 50 ? 'text-emerald-500' : (theme.repaymentPct >= 20 ? 'text-amber-500' : 'text-red-500')}`}>
-            {theme.repaymentLevel}
-          </span>
-        </div>
-
-        {/* Edit Financial & Loan Profile Button */}
+        {/* Edit Financial & Loan Profile Action Bar */}
         <div className="flex justify-end pt-1">
           <button
             onClick={onEditLoan}

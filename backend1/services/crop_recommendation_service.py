@@ -18,7 +18,8 @@ if os.path.exists(ARTIFACT_PATH):
         print(f"Error loading pipeline: {e}")
 
 # Weatherstack API Key
-WEATHERSTACK_API_KEY = "5a34408e122db6b3df181c1376a69e33"
+import os
+WEATHERSTACK_API_KEY = os.getenv("WEATHERSTACK_API_KEY", "")
 
 # District reference coordinates for Odisha's 30 districts
 ODISHA_DISTRICTS_COORDS = {

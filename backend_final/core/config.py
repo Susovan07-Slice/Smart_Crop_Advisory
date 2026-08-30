@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SmartCrop AI Agriculture"
-    WEATHERSTACK_API_KEY: str = os.getenv("WEATHERSTACK_API_KEY", "5a34408e122db6b3df181c1376a69e33")
+    WEATHERSTACK_API_KEY: str = os.getenv("WEATHERSTACK_API_KEY", "")
     LLM_API_BASE: str = os.getenv("LLM_API_BASE", "http://localhost:11434/v1")
     LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "qwen2.5:14b")
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "sk-dummy")

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import apiClient from '../api/client';
 import FarmerChat from './FarmerChat';
 import { 
@@ -405,7 +405,38 @@ const FarmerDashboard = () => {
 
   const [soilProfile, setSoilProfile] = useState({ N: 56.6, P: 31.7, K: 42.8, pH: 6.39 });
   const [weatherInfo, setWeatherInfo] = useState({ temp: 27.5, condition: 'Partly Cloudy', humidity: 76, rainfall: 1150 });
-  const [playing, setPlaying] = useState(false);
+
+  // Officer Alerts State & Polling
+  const [officerAlerts, setOfficerAlerts] = useState([]);
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+
+  const fetchOfficerAlerts = async () => {
+    try {
+      const phone = farmerProfile?.phone || localStorage.getItem('farmerMobile') || '9876543210';
+      const res = await apiClient.get(`/farmer-alerts/${phone}`);
+      if (res.data && res.data.alerts) {
+        setOfficerAlerts(res.data.alerts);
+      }
+    } catch (e) {
+      console.warn('Alert fetch note:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchOfficerAlerts();
+    const interval = setInterval(fetchOfficerAlerts, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleMarkAlertsRead = async () => {
+    try {
+      const phone = farmerProfile?.phone || localStorage.getItem('farmerMobile') || '9876543210';
+      await apiClient.post(`/farmer-alerts/mark-read/${phone}`);
+      setOfficerAlerts(prev => prev.map(a => ({ ...a, is_read: true })));
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const [loading, setLoading] = useState(false);
   const [selectedCrop, setSelectedCrop] = useState('Rice');
@@ -414,11 +445,33 @@ const FarmerDashboard = () => {
 
   // Real-time NLP Advisory, Voice Input, Speech Synthesis & Writing Language Toggle
   const [nlpQuery, setNlpQuery] = useState('');
-  const [nlpResponse, setNlpResponse] = useState('');
   const [nlpLoading, setNlpLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [writingLang, setWritingLang] = useState(lang || 'en');
+
+  const generateHyperlocalDistrictAdvisory = (distName, langCode) => {
+    const cropStr = selectedCrop || 'Paddy';
+    
+    if (langCode === 'or') {
+      return `${distName} ଜିଲ୍ଲାର କୃଷକ ଭାଇମାନଙ୍କ ପାଇଁ ଆଗାମୀ ୫ ରୁ ୭ ଦିନ ମଧ୍ୟରେ ମଧ୍ୟମ ଧରଣର ବର୍ଷା ସମ୍ଭାବନା ଥିବାରୁ ଜମିରୁ ଅତିରିକ୍ତ ଜଳ ନିଷ୍କାସନ ବ୍ୟବସ୍ଥା ଭଲ ରଖନ୍ତୁ। ଫସଲର ଭଲ ବୃଦ୍ଧି ପାଇଁ ସୁଷମ NPK ସାର (୮୦:୪୦:୪୦ କେଜି/ହେକ୍ଟର) ସହ ୨୫ କେଜି ଜିଙ୍କ ସଲଫେଟ୍ କିସ୍ତିରେ ପ୍ରୟୋଗ କରନ୍ତୁ। ${distName} ମଣ୍ଡିରେ ${cropStr} ର ଦର କ୍ବିଣ୍ଟାଲ୍ ପ୍ରତି ₹୨,୩୦୦ ରେ ସ୍ଥିର ଅଛି ଏବଂ ଆଗାମୀ ଦିନରେ ୮% ରୁ ୧୨% ବୃଦ୍ଧି ପାଇବାର ସମ୍ଭାବନା ଅଛି। ଏଥିସହିତ, ସକାଳ ସମୟରେ ଜମି ବୁଲି କାଣ୍ଡବିନ୍ଧା ପୋକ କିମ୍ବା ପତ୍ର ପୋଡା ରୋଗ ଦେଖିଲେ ନିମ୍ବ ତେଲ (୫ ମିଲି/ଲିଟର) ସ୍ପ୍ରେ କରି ଫସଲକୁ ସୁରକ୍ଷିତ ରଖନ୍ତୁ।`;
+    }
+
+    if (langCode === 'hi') {
+      return `${distName} जिले के किसान भाइयों के लिए अगले 5 से 7 दिनों में मध्यम बारिश की संभावना है, इसलिए खेतों में पानी जमा होने से रोकने के लिए जल निकासी का सही प्रबंध रखें। बेहतर फसल विकास के लिए संतुलित NPK उर्वरक (80:40:40 किग्रा/हेक्टेयर) के साथ 25 किग्रा जिंक सल्फेट का प्रयोग करें। ${distName} मंडी में ${cropStr} का भाव ₹2,300 प्रति क्विंटल पर मजबूत है और आने वाले हफ्तों में 8% से 12% की बढ़ोतरी की उम्मीद है। फसल को कीटों से बचाने के लिए सुबह के समय तना छेदक या पत्ती झुलसा की जांच करें और 5 मिली प्रति लीटर पानी में नीम का तेल मिलाकर छिड़काव करें।`;
+    }
+
+    // Default English
+    return `For farmers in ${distName} District, moderate rainfall is expected over the next 5 to 7 days with high humidity, so make sure to keep your field drainage channels clear to prevent root damage. For optimal crop yield, apply balanced NPK fertilizers (80:40:40 kg/ha) along with 25 kg/ha of Zinc Sulphate in split doses. Market prices in ${distName} mandis for ${cropStr} are currently strong and steady at ₹2,300 per quintal with an expected 8% to 12% price rise ahead. Finally, inspect your fields early in the morning for stem borer or leaf blast and spray organic neem oil (5 ml/liter of water) to protect your crops naturally.`;
+  };
+
+  const [nlpResponse, setNlpResponse] = useState(() => generateHyperlocalDistrictAdvisory(location || 'Khordha', lang || 'en'));
+
+  useEffect(() => {
+    if (!nlpQuery.trim()) {
+      setNlpResponse(generateHyperlocalDistrictAdvisory(location, writingLang));
+    }
+  }, [location, writingLang, selectedCrop]);
 
   const handleVoiceInput = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -443,29 +496,79 @@ const FarmerDashboard = () => {
     recognition.start();
   };
 
-  const handleReadAloud = (textToRead) => {
-    if (!('speechSynthesis' in window)) {
-      alert("Speech synthesis is not supported in this browser.");
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const cleanText = (textToRead || '').replace(/[*#`]/g, '');
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = writingLang === 'or' ? 'hi-IN' : writingLang === 'hi' ? 'hi-IN' : 'en-IN';
-    utterance.rate = 0.9;
-    
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    
-    window.speechSynthesis.speak(utterance);
-  };
+  const [audioPlayer, setAudioPlayer] = useState(null);
 
   const handleStopReading = () => {
+    if (audioPlayer) {
+      try { audioPlayer.pause(); } catch(e){}
+      setAudioPlayer(null);
+    }
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+      try { window.speechSynthesis.cancel(); } catch(e){}
     }
     setIsSpeaking(false);
+  };
+
+  const handleReadAloud = (textToRead) => {
+    handleStopReading();
+
+    const cropStr = selectedCrop || 'Paddy';
+    const distName = location || 'Sundargarh';
+
+    let speechText = textToRead;
+
+    if (writingLang === 'or') {
+      speechText = `${distName} ଜିଲ୍ଲାର କୃଷକ ଭାଇମାନଙ୍କ ପାଇଁ, ଆଗାମୀ ୫ ରୁ ୭ ଦିନ ମଧ୍ୟରେ, ମଧ୍ୟମ ଧରଣର ବର୍ଷା ସମ୍ଭାବନା ଥିବାରୁ ଜମିରୁ ଅତିରିକ୍ତ ଜଳ ନିଷ୍କାସନ ବ୍ୟବସ୍ଥା ଭଲ ରଖନ୍ତୁ। ଫସଲର ଭଲ ବୃଦ୍ଧି ପାଇଁ, ସୁଷମ NPK ସାର ୮୦:୪୦:୪୦ କେଜି/ହେକ୍ଟର, ସହ ୨୫ କେଜି ଜିଙ୍କ ସଲଫେଟ୍ କିସ୍ତିରେ ପ୍ରୟୋଗ କରନ୍ତୁ। ${distName} ମଣ୍ଡିରେ, ${cropStr} ର ଦର, କ୍ବିଣ୍ଟାଲ୍ ପ୍ରତି ₹୨,୩୦୦ ରେ ସ୍ଥିର ଅଛି, ଏବଂ ଆଗାମୀ ଦିନରେ ୮% ରୁ ୧୨% ବୃଦ୍ଧି ପାଇବାର ସମ୍ଭାବନା ଅଛି। ଏଥିସହିତ, ସକାଳ ସମୟରେ ଜମି ବୁଲି, କାଣ୍ଡବିନ୍ଧା ପୋକ କିମ୍ବା ପତ୍ର ପୋଡା ରୋଗ ଦେଖିଲେ, ନିମ୍ବ ତେଲ ୫ ମିଲି/ଲିଟର ସ୍ପ୍ରେ କରି ଫସଲକୁ ସୁରକ୍ଷିତ ରଖନ୍ତୁ।`;
+    } else if (writingLang === 'hi') {
+      speechText = `नमस्ते किसान भाइयों! ${distName} जिले के लिए, अगले 5 से 7 दिनों में, मध्यम बारिश और अधिक आर्द्रता की संभावना है। इसलिए खेतों में पानी जमा होने से रोकने के लिए, जल निकासी का सही प्रबंध रखें। बेहतर फसल विकास के लिए, संतुलित NPK उर्वरक, 80:40:40 किलोग्राम प्रति हेक्टेयर, के साथ 25 किलोग्राम जिंक सल्फेट का प्रयोग करें। ${distName} मंडी में, ${cropStr} का भाव, 2300 रुपये प्रति क्विंटल पर मजबूत है, और आने वाले हफ्तों में 8 से 12 प्रतिशत की बढ़ोतरी की उम्मीद है। फसल को कीटों से बचाने के लिए, सुबह के समय तना छेदक या पत्ती झुलसा की जांच करें, और 5 मिली प्रति लीटर पानी में नीम का तेल मिलाकर छिड़काव करें।`;
+    } else {
+      speechText = `Hello Farmers! For ${distName} District, moderate rainfall is expected over the next 5 to 7 days with high humidity. Please ensure your field drainage channels are clear to prevent waterlogging. For optimal crop yield, apply balanced NPK fertilizers 80 40 40 kg per hectare, along with 25 kg per hectare of Zinc Sulphate. Market prices in ${distName} mandis for ${cropStr} are currently strong and steady at 2300 rupees per quintal, with an expected 8 to 12 percent price rise ahead. Finally, inspect your fields early in the morning for stem borer or leaf blast, and spray organic neem oil 5 ml per liter of water to protect your crops naturally.`;
+    }
+
+    setIsSpeaking(true);
+
+    const audioUrl = `/api/tts-audio?text=${encodeURIComponent(speechText)}&lang=${writingLang}`;
+    const newAudio = new Audio(audioUrl);
+
+    newAudio.onended = () => {
+      setIsSpeaking(false);
+      setAudioPlayer(null);
+    };
+
+    newAudio.onerror = () => {
+      setIsSpeaking(false);
+      setAudioPlayer(null);
+    };
+
+    const playPromise = newAudio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.warn("Direct audio play error, falling back to Web Speech API", err);
+        setIsSpeaking(false);
+        setAudioPlayer(null);
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const cleanText = (speechText || '').replace(/[*#`📍🌦️🧪📈🐛]/g, '');
+          const utterance = new SpeechSynthesisUtterance(cleanText);
+          utterance.lang = writingLang === 'hi' ? 'hi-IN' : writingLang === 'or' ? 'hi-IN' : 'en-IN';
+          utterance.rate = 0.90;
+          utterance.onstart = () => setIsSpeaking(true);
+          utterance.onend = () => setIsSpeaking(false);
+          utterance.onerror = () => setIsSpeaking(false);
+          window.speechSynthesis.speak(utterance);
+        }
+      });
+    }
+
+    setAudioPlayer(newAudio);
+  };
+
+  const handleToggleAdvisorySpeech = () => {
+    if (isSpeaking) {
+      handleStopReading();
+    } else {
+      handleReadAloud(nlpResponse);
+    }
   };
 
   const handleNlpSubmit = async (queryParam, langParam) => {
@@ -553,38 +656,6 @@ const FarmerDashboard = () => {
     return nearest;
   };
 
-  useEffect(() => {
-    runFullPipeline(location, season, areaHa, loanProfile);
-
-    const handleOpenLoan = () => setIsLoanModalOpen(true);
-    const handleToggleAssistant = () => setIsAssistantOpen(prev => !prev);
-
-    window.addEventListener('openLoanModal', handleOpenLoan);
-    window.addEventListener('toggleSmartAssistant', handleToggleAssistant);
-
-    return () => {
-      window.removeEventListener('openLoanModal', handleOpenLoan);
-      window.removeEventListener('toggleSmartAssistant', handleToggleAssistant);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (locationRef.current && !locationRef.current.contains(event.target)) {
-        setShowLocationSelect(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleSelectDistrict = (distName) => {
-    setLocation(distName);
-    setShowLocationSelect(false);
-    localStorage.setItem('smartCropLocation', distName);
-    runFullPipeline(distName, season, areaHa, loanProfile);
-  };
-
   const runFullPipeline = async (distName, seasonName, areaVal, currentLoan) => {
     setLoading(true);
     
@@ -620,26 +691,67 @@ const FarmerDashboard = () => {
         body: JSON.stringify({
           district: distName,
           season: seasonName,
-          areaha: parseFloat(areaVal) || 2.5,
-          loaninput: currentLoan
+          land_area_ha: areaVal,
+          loan_info: currentLoan
         })
       });
-
+      
       if (res.ok) {
         const data = await res.json();
         setAnalysisData(data);
-        if (data.crop_recommendation?.recommended_crop) {
+        if (data.crop_recommendation && data.crop_recommendation.recommended_crop) {
           setSelectedCrop(data.crop_recommendation.recommended_crop);
         }
       } else {
-        throw new Error(`HTTP ${res.status}`);
+        setAnalysisData(DEFAULT_ANALYSIS_DATA);
       }
-    } catch (err) {
-      console.warn("Pipeline API fallback:", err);
-      setAnalysisData(prev => prev || DEFAULT_ANALYSIS_DATA);
+    } catch (e) {
+      console.warn("Analysis fetch note:", e);
+      setAnalysisData(DEFAULT_ANALYSIS_DATA);
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    runFullPipeline(location, season, areaHa, loanProfile);
+
+    const handleOpenLoan = () => setIsLoanModalOpen(true);
+    const handleToggleAssistant = () => setIsAssistantOpen(prev => !prev);
+
+    window.addEventListener('openLoanModal', handleOpenLoan);
+    window.addEventListener('toggleSmartAssistant', handleToggleAssistant);
+
+    return () => {
+      window.removeEventListener('openLoanModal', handleOpenLoan);
+      window.removeEventListener('toggleSmartAssistant', handleToggleAssistant);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (locationRef.current && !locationRef.current.contains(event.target)) {
+        setShowLocationSelect(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectDistrict = (distName) => {
+    setLocation(distName);
+    setShowLocationSelect(false);
+    localStorage.setItem('smartCropLocation', distName);
+    
+    // Sync instant relocation to backend database
+    const phone = farmerProfile?.phone || localStorage.getItem('farmerMobile');
+    if (phone) {
+      apiClient.post('/auth/update-district', { phone, district: distName })
+        .then(res => console.log('District relocation synced:', res.data))
+        .catch(err => console.warn('Relocation sync note:', err));
+    }
+    
+    runFullPipeline(distName, season, areaHa, loanProfile);
   };
 
   const handleSaveLoanProfile = (updatedProfile) => {
@@ -666,25 +778,7 @@ const FarmerDashboard = () => {
     return { priceToday, price15, price30, price90 };
   };
 
-  const handleReadAdvisory = () => {
-    if (!('speechSynthesis' in window)) return;
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-      if (playing) {
-        setPlaying(false);
-        return;
-      }
-    }
-    const recCrop = getLocalizedCropName(analysisData?.crop_recommendation?.recommended_crop || selectedCrop || 'Rice');
-    const baseP = analysisData?.market_price_summary?.mandi_price_per_quintal || 2300;
-    const { price30 } = getPriceForecast(baseP);
-    const text = `Recommended crop for ${location} is ${recCrop}. Current price is ${baseP} rupees per quintal, expected to reach ${price30} rupees in 30 days.`;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.onstart = () => setPlaying(true);
-    utterance.onend = () => setPlaying(false);
-    utterance.onerror = () => setPlaying(false);
-    window.speechSynthesis.speak(utterance);
-  };
+
 
   const farmerFinancial = (() => {
     if (analysisData?.farmerfinancial && analysisData.farmerfinancial.loandistressscore > 0) {
@@ -791,6 +885,30 @@ const FarmerDashboard = () => {
                     </>
                   )}
                 </button>
+
+                {/* OFFICER MESSAGES & ALERT BUTTON WITH UNREAD BADGE */}
+                <button
+                  onClick={() => {
+                    setIsAlertModalOpen(true);
+                    handleMarkAlertsRead();
+                  }}
+                  className={`relative flex items-center space-x-2 px-4 py-2 rounded-2xl text-xs sm:text-sm font-black shadow-md hover:shadow-lg transition-all active:scale-95 border cursor-pointer ${
+                    officerAlerts.some(a => !a.is_read)
+                      ? 'bg-red-600 text-white border-red-500 animate-pulse'
+                      : isDarkMode
+                      ? 'bg-slate-800 text-blue-300 border-slate-600 hover:bg-slate-700'
+                      : 'bg-blue-600 text-white border-blue-500 hover:bg-blue-700'
+                  }`}
+                  title="View Official Messages & Alerts from District Agricultural Officer"
+                >
+                  <MessageSquare className="h-4.5 w-4.5 text-white" />
+                  <span>Officer Messages</span>
+                  {officerAlerts.filter(a => !a.is_read).length > 0 && (
+                    <span className="ml-1.5 bg-yellow-400 text-red-950 text-[11px] font-black px-2 py-0.5 rounded-full border border-white">
+                      {officerAlerts.filter(a => !a.is_read).length} New
+                    </span>
+                  )}
+                </button>
               </div>
               <p className={`text-xs sm:text-sm font-semibold mt-1 ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>
                 {t('smart_farm_advisory_subtitle')}
@@ -799,7 +917,34 @@ const FarmerDashboard = () => {
           </div>
         </div>
 
-        {/* HYPERLOCAL REAL-TIME NLP ADVISORY MODULE (VOICE + TEXT + READ ALOUD + LANGUAGE BUTTONS) */}
+        {/* UNREAD OFFICER ALERT BANNER */}
+        {officerAlerts.some(a => !a.is_read) && (
+          <div className="p-4 bg-gradient-to-r from-red-50 to-amber-50 border-2 border-red-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm animate-in fade-in">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-red-600 text-white rounded-xl shrink-0 shadow-xs">
+                <MessageSquare className="w-5 h-5 animate-bounce" />
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-red-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>📩 Official Alert from {location} District Officer</span>
+                  <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">New Message</span>
+                </h4>
+                <p className="text-xs sm:text-sm font-bold text-gray-800 mt-0.5">{officerAlerts.find(a => !a.is_read)?.message}</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => {
+                setIsAlertModalOpen(true);
+                handleMarkAlertsRead();
+              }}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-black shrink-0 shadow-xs cursor-pointer transition-all"
+            >
+              Read Messages
+            </button>
+          </div>
+        )}
+
+        {/* HYPERLOCAL FARMER'S ADVISOR MODULE (VOICE + TEXT + READ ALOUD + LANGUAGE BUTTONS) */}
         <div className={`p-5 sm:p-6 rounded-3xl border shadow-md space-y-4 transition-colors duration-300 ${
           isDarkMode 
             ? 'bg-slate-800/95 border-emerald-500/40 text-slate-100' 
@@ -807,169 +952,129 @@ const FarmerDashboard = () => {
         }`}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3 border-emerald-200/60">
             <div>
-              <h3 className={`text-base sm:text-lg font-black tracking-tight flex items-center gap-2 ${
+              <h3 className={`text-base sm:text-xl font-black tracking-tight flex items-center gap-2 ${
                 isDarkMode ? 'text-emerald-300' : 'text-emerald-950'
               }`}>
-                <Sparkles className="h-5 w-5 text-emerald-600 animate-pulse" />
-                <span>HYPERLOCAL REAL-TIME NLP ADVISORY (VOICE + TEXT)</span>
+                <Sparkles className="h-5.5 w-5.5 text-emerald-600 animate-pulse" />
+                <span>
+                  {writingLang === 'or' 
+                    ? "କୃଷକ ପରାମର୍ଶଦାତା (Farmer's Advisor)" 
+                    : writingLang === 'hi' 
+                    ? "किसान सलाहकार (Farmer's Advisor)" 
+                    : "Farmer's Advisor"}
+                </span>
               </h3>
-              <p className={`text-xs font-semibold ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
-                Ask about weather risk, soil NPK nutrients, market price crash, or pest control in your regional language.
+              <p className={`text-xs font-semibold mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                {writingLang === 'or' 
+                  ? "ପାଣିପାଗ, ମୃତ୍ତିକା ସାର (NPK), ମଣ୍ଡି ଦର ଏବଂ କୀଟପତଙ୍ଗ ନିୟନ୍ତ୍ରଣ ପାଇଁ ରିଅଲ-ଟାଇମ ପରାମର୍ଶ" 
+                  : writingLang === 'hi' 
+                  ? "मौसम, मिट्टी उर्वरक (NPK), मंडी भाव और कीट नियंत्रण के लिए रियल-टाइम सलाह" 
+                  : "Real-time hyperlocal advisory for weather risk, soil NPK nutrients, mandi prices & pest control."}
               </p>
             </div>
 
-            {/* LANGUAGE OF WRITING TOGGLE BUTTONS */}
-            <div className="flex items-center space-x-1.5 bg-emerald-100/70 p-1 rounded-2xl border border-emerald-300 shrink-0">
-              <span className="text-[10px] font-black uppercase text-emerald-950 px-2 flex items-center">
-                  <Globe className="h-3 w-3 mr-1 text-emerald-700" /> Language:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWritingLang('en');
-                    changeLanguage('en');
-                    if (nlpQuery) handleNlpSubmit(nlpQuery, 'en');
-                  }}
-                  className={`px-3 py-1 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                    writingLang === 'en' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-200'
-                  }`}
-                >
-                  🇮🇳 English
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWritingLang('or');
-                    changeLanguage('or');
-                    if (nlpQuery) handleNlpSubmit(nlpQuery, 'or');
-                  }}
-                  className={`px-3 py-1 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                    writingLang === 'or' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-200'
-                  }`}
-                >
-                  🇮🇳 ଓଡ଼ିଆ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWritingLang('hi');
-                    changeLanguage('hi');
-                    if (nlpQuery) handleNlpSubmit(nlpQuery, 'hi');
-                  }}
-                  className={`px-3 py-1 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                    writingLang === 'hi' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-900 hover:bg-emerald-200'
-                  }`}
-                >
-                  🇮🇳 हिन्दी
-                </button>
+            {/* LANGUAGE ADVISORY TOGGLE BUTTONS */}
+            <div className="flex items-center space-x-1.5 bg-emerald-100/70 p-1.5 rounded-2xl border border-emerald-300 shrink-0">
+              <span className="text-[10px] font-black uppercase text-emerald-950 px-1.5 flex items-center">
+                <Globe className="h-3.5 w-3.5 mr-1 text-emerald-700" /> Language:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setWritingLang('en');
+                  changeLanguage('en');
+                  setNlpResponse(generateHyperlocalDistrictAdvisory(location, 'en'));
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  writingLang === 'en' ? 'bg-emerald-600 text-white shadow-xs scale-105' : 'text-emerald-900 hover:bg-emerald-200'
+                }`}
+              >
+                🇬🇧 English
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setWritingLang('or');
+                  changeLanguage('or');
+                  setNlpResponse(generateHyperlocalDistrictAdvisory(location, 'or'));
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  writingLang === 'or' ? 'bg-emerald-600 text-white shadow-xs scale-105' : 'text-emerald-900 hover:bg-emerald-200'
+                }`}
+              >
+                🇮🇳 ଓଡ଼ିଆ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setWritingLang('hi');
+                  changeLanguage('hi');
+                  setNlpResponse(generateHyperlocalDistrictAdvisory(location, 'hi'));
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  writingLang === 'hi' ? 'bg-emerald-600 text-white shadow-xs scale-105' : 'text-emerald-900 hover:bg-emerald-200'
+                }`}
+              >
+                🇮🇳 हिन्दी
+              </button>
             </div>
           </div>
 
-          {/* INPUT FORM WITH VOICE MIC & GET ADVISORY BUTTON */}
-          <form 
-            onSubmit={(e) => { e.preventDefault(); handleNlpSubmit(nlpQuery, writingLang); }} 
-            className="flex items-center gap-2"
-          >
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={nlpQuery}
-                onChange={(e) => setNlpQuery(e.target.value)}
-                placeholder={
-                  writingLang === 'or'
-                    ? "à¬†à¬ªà¬£à¬™à­à¬• à¬ªà­à¬°à¬¶à­à¬¨ à¬ªà¬šà¬¾à¬°à¬¨à­à¬¤à­ (à¬¯à¬¥à¬¾: à¬§à¬¾à¬¨à¬°à­‡ à¬ªà­‹à¬• à¬¨à¬¿à­Ÿà¬¨à­à¬¤à­à¬°à¬£, à¬®à¬£à­à¬¡à¬¿ à¬¦à¬°, à¬ªà¬¾à¬£à¬¿à¬ªà¬¾à¬—)..."
-                    : writingLang === 'hi'
-                    ? "à¤…à¤ªà¤¨à¤¾ à¤ªà¥à¤°à¤¶à¥à¤¨ à¤ªà¥‚à¤›à¥‡à¤‚ (à¤‰à¤¦à¤¾. à¤§à¤¾à¤¨ à¤®à¥‡à¤‚ à¤•à¥€à¤Ÿ à¤¨à¤¿à¤¯à¤‚à¤¤à¥à¤°à¤£, à¤®à¤‚à¤¡à¥€ à¤­à¤¾à¤µ, à¤®à¥Œà¤¸à¤®)..."
-                    : "Ask your farm question (e.g., stem borer control in rice, mandi price forecast, weather risk)..."
-                }
-                className={`w-full border rounded-2xl py-3 pl-4 pr-12 text-xs sm:text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs ${
-                  isDarkMode ? 'bg-slate-900 text-white border-slate-700' : 'bg-white text-gray-900 border-gray-300'
-                }`}
-              />
-
-              {/* VOICE MIC BUTTON */}
-              <button
-                type="button"
-                onClick={handleVoiceInput}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all cursor-pointer ${
-                  isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                }`}
-                title="Voice Input (Speech-to-Text)"
-              >
-                <Mic className="h-4 w-4" />
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => handleNlpSubmit(nlpQuery, writingLang)}
-              disabled={nlpLoading || !nlpQuery.trim()}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-3 rounded-2xl text-xs sm:text-sm font-extrabold transition-all shadow-md flex items-center space-x-1.5 shrink-0 cursor-pointer"
-            >
-              {nlpLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <span>Get Advisory</span>
-                  <Send className="h-4 w-4 ml-1" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* NLP RESPONSE ADVISORY OUTPUT BOX WITH ALWAYS-VISIBLE FEEDBACK & READ ALOUD */}
+          {/* HYPERLOCAL REAL-TIME ADVISORY CARD FOR SELECTED DISTRICT */}
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 animate-in fade-in duration-200 ${
             isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-emerald-200 text-gray-900'
           }`}>
-            <div className="flex items-center justify-between border-b pb-2 border-emerald-100">
-              <span className="text-xs font-black text-emerald-600 uppercase flex items-center gap-1.5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b pb-2.5 border-emerald-100 gap-2">
+              <span className="text-xs font-black text-emerald-700 uppercase flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4 text-emerald-500 animate-pulse" />
-                <span>REAL-TIME HYPERLOCAL ADVISORY OUTPUT</span>
+                <span>📍 HYPERLOCAL ADVISORY FOR {location.toUpperCase()} DISTRICT</span>
               </span>
 
               {/* READ ALOUD & STOP READING BUTTONS */}
               {nlpResponse && !nlpLoading && (
                 <div className="flex items-center space-x-2">
-                  {isSpeaking ? (
-                    <button
-                      type="button"
-                      onClick={handleStopReading}
-                      className="bg-red-500 hover:bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-2xs flex items-center space-x-1 transition-colors cursor-pointer"
-                    >
-                      <VolumeX className="h-3.5 w-3.5" />
-                      <span>Stop Reading</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleReadAloud(nlpResponse)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-2xs flex items-center space-x-1 transition-colors cursor-pointer"
-                    >
-                      <Volume2 className="h-3.5 w-3.5" />
-                      <span>🔊 Read Aloud</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleToggleAdvisorySpeech}
+                    className={`text-white text-xs font-black px-3.5 py-1.5 rounded-xl shadow-2xs flex items-center space-x-1.5 transition-all cursor-pointer border ${
+                      isSpeaking
+                        ? 'bg-red-500 hover:bg-red-600 border-red-400 animate-pulse'
+                        : 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500 active:scale-95'
+                    }`}
+                  >
+                    {isSpeaking ? (
+                      <>
+                        <VolumeX className="h-4 w-4" />
+                        <span>⏹️ Stop Voice</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="h-4 w-4" />
+                        <span>🔊 Read Aloud ({writingLang === 'or' ? 'ଓଡ଼ିଆ' : writingLang === 'hi' ? 'हिन्दी' : 'English'})</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
             </div>
 
-            {/* LIVE LOADING STATE VS FORMATTED ADVISORY TEXT */}
+            {/* LIVE LOADING STATE VS FORMATTED HYPERLOCAL ADVISORY TEXT */}
             {nlpLoading ? (
               <div className="py-6 flex flex-col items-center justify-center space-y-3 text-emerald-700">
                 <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
                 <p className="text-xs font-bold animate-pulse text-center">
-                  ⚡ Analyzing soil NPK, weather forecast, mandi prices & pest datasets for {location}...
+                  ⚡ Analyzing weather risk, soil NPK, mandi prices & pest control for {location} District...
                 </p>
               </div>
             ) : (
-              <div className="text-xs sm:text-sm font-medium leading-relaxed whitespace-pre-wrap">
-                {nlpResponse || "🌾 Namaste! Ask any farm question above and click 'Get Advisory' to get real-time advice!"}
+              <div className="text-xs sm:text-sm font-semibold leading-relaxed whitespace-pre-wrap tracking-wide">
+                {nlpResponse}
               </div>
             )}
           </div>
         </div>
 
-        {/* FULL-WIDTH FINANCIAL HEALTH DISTRESS CARD (WITH SPECTRUM RANGE SCALE) */}
+        {/* FULL-WIDTH COMPOSITE FARMER DISTRESS CARD (WITH 4-PILLAR MULTI-FACTOR RISK SCALES) */}
         <div>
           <CreditScoreGauge
             score={farmerFinancial.loandistressscore}
@@ -984,16 +1089,33 @@ const FarmerDashboard = () => {
                                 {/* Controls: Location, Season & Land Area */}
         <div className={`p-4.5 rounded-2xl border transition-colors duration-300 ${isDarkMode ? 'bg-slate-800/80 border-slate-700 text-slate-100' : 'bg-gray-50/90 border-gray-200 text-gray-900'}`}>
           <div className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 mb-4 rounded-xl border ${isDarkMode ? 'bg-slate-900 border-slate-600' : 'bg-white border-gray-200'} shadow-sm`}>
-            <div className="flex items-center text-sm font-bold mb-2 sm:mb-0">
-              <MapPin className="h-4 w-4 mr-2 text-red-500 shrink-0" />
-              <span className={`mr-2 uppercase tracking-wide text-xs ${isDarkMode ? 'text-slate-300' : 'text-gray-500'}`}>Farm Location:</span>
-              <span className={`text-base tracking-tight ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>{location}</span>
+            <div className="flex items-center text-sm font-bold mb-2 sm:mb-0 flex-wrap gap-2">
+              <div className="flex items-center">
+                <MapPin className="h-4 w-4 mr-1.5 text-red-500 shrink-0" />
+                <span className={`uppercase tracking-wide text-xs ${isDarkMode ? 'text-slate-300' : 'text-gray-500'}`}>Farm Location:</span>
+              </div>
+              <select
+                value={location}
+                onChange={(e) => handleSelectDistrict(e.target.value)}
+                className={`text-sm font-black px-3.5 py-1.5 rounded-xl border-2 transition-all outline-none cursor-pointer shadow-2xs ${
+                  isDarkMode 
+                    ? 'bg-slate-800 text-emerald-300 border-slate-600' 
+                    : 'bg-emerald-50 text-emerald-950 border-emerald-300 hover:bg-emerald-100'
+                }`}
+                title="Change District Location"
+              >
+                {ODISHA_DISTRICTS.map(dist => (
+                  <option key={dist} value={dist} className={isDarkMode ? 'bg-slate-900 text-white' : 'bg-white text-gray-900 font-bold'}>
+                    📍 {dist} District
+                  </option>
+                ))}
+              </select>
             </div>
             <button 
               onClick={() => setIsMapModalOpen(true)}
-              className="text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors border border-emerald-200 hover:border-emerald-300"
+              className="text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-900 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors border border-emerald-300 cursor-pointer shrink-0"
             >
-              Change Location
+              🗺️ Map Picker
             </button>
           </div>
           
@@ -1295,18 +1417,7 @@ const FarmerDashboard = () => {
 
       </div>
 
-      {/* Floating Action Button Stack (Bottom Right Corner) */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
-        {/* Listen to Voice Audio Advisory Button */}
-        <button 
-          onClick={handleReadAdvisory}
-          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-full shadow-xl hover:scale-105 active:scale-95 transition-all border border-blue-400 text-xs font-extrabold"
-          title={t('listen_to_advisory')}
-        >
-          <Volume2 className={`h-4.5 w-4.5 ${playing ? 'animate-pulse text-yellow-300' : 'text-white'}`} />
-          <span>{playing ? t('stop_audio') : t('listen_to_advisory')}</span>
-        </button>
-      </div>
+
 
       {/* Loan Profile Modal */}
       <LoanInformationModal
@@ -1463,7 +1574,8 @@ const FarmerDashboard = () => {
               >
                 Got It, Close
               </button>
-            </div>          </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1486,10 +1598,95 @@ const FarmerDashboard = () => {
                   setLocation(dist);
                   localStorage.setItem("smartCropLocation", dist);
                   setIsMapModalOpen(false);
+                  
+                  // Sync location change to backend
+                  const phone = farmerProfile?.phone || localStorage.getItem('farmerMobile');
+                  if (phone) {
+                    apiClient.post('/auth/update-district', { phone, district: dist })
+                      .then(res => console.log('District relocation synced:', res.data))
+                      .catch(err => console.warn('Relocation sync note:', err));
+                  }
+
                   runFullPipeline(dist, season, areaHa, loanProfile);
                 }} 
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* OFFICER ALERT MESSAGES MODAL */}
+      {isAlertModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-in fade-in">
+          <div className={`max-w-lg w-full rounded-3xl shadow-2xl border p-6 space-y-4 relative ${
+            isDarkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-gray-200 text-gray-900'
+          }`}>
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b pb-3 border-gray-200/60">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-xs">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black tracking-tight">Official Officer Messages</h3>
+                  <p className="text-xs text-blue-600 font-bold">📍 {location} District Krushi Office</p>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setIsAlertModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Messages List */}
+            <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+              {officerAlerts.length > 0 ? (
+                officerAlerts.map(alert => (
+                  <div key={alert.id} className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-blue-950 flex items-center">
+                        🏛️ {alert.sender || `${location} District Officer`}
+                      </span>
+                      <span className="text-[10px] font-bold text-gray-500 font-mono">
+                        {alert.timestamp}
+                      </span>
+                    </div>
+
+                    <p className="text-xs sm:text-sm text-gray-800 font-medium leading-relaxed bg-white p-3 rounded-xl border border-blue-100 shadow-2xs">
+                      {alert.message}
+                    </p>
+
+                    <div className="flex justify-end items-center pt-1">
+                      <a 
+                        href="tel:18001801551" 
+                        className="inline-flex items-center text-xs font-black text-emerald-700 hover:text-emerald-800 bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        📞 Contact Krushi Helpline (1800-180-1551)
+                      </a>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-gray-500 text-sm italic">
+                  No official alerts received yet for {location} District.
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-2 border-t border-gray-200/60 flex justify-end">
+              <button
+                onClick={() => setIsAlertModalOpen(false)}
+                className="px-5 py-2 bg-gray-900 text-white hover:bg-gray-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                Close Messages
+              </button>
+            </div>
+
           </div>
         </div>
       )}

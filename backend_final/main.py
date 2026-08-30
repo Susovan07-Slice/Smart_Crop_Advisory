@@ -39,6 +39,28 @@ app.include_router(farmers.router, prefix="/api", tags=["Farmer Records & Office
 app.include_router(weather.router, prefix="/api", tags=["Weather & Soil Profiles"])
 app.include_router(chat.router, prefix="/api", tags=["Chatbot Assistant"])
 
+from services.tts_engine import generate_speech_audio
+from fastapi import HTTPException
+from pydantic import BaseModel
+
+class TTSRequest(BaseModel):
+    text: str
+    lang: str = "hi"
+
+@app.api_route("/api/tts-audio", methods=["GET", "POST"])
+def get_tts_audio(req: TTSRequest = None, text: str = None, lang: str = "hi"):
+    """
+    Returns crystal-clear, HD Google Speech AI Audio stream via GET or POST.
+    """
+    try:
+        speech_text = req.text if (req and req.text) else (text or "Namaste")
+        speech_lang = req.lang if (req and req.lang) else lang
+        file_path = generate_speech_audio(speech_text, speech_lang)
+        return FileResponse(file_path, media_type="audio/mpeg", filename="advisory.mp3")
+    except Exception as e:
+        print(f"TTS endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Path to the React static frontend directory (targets dist build)
 base_dir = os.path.dirname(os.path.dirname(__file__))
 frontend_dist = os.path.abspath(os.path.join(base_dir, "SmartCrop-main", "SmartCrop-main", "frontend", "dist"))

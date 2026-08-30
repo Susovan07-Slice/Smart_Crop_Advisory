@@ -5,7 +5,7 @@ import Login from './pages/Login';
 import FarmerDashboard from './pages/FarmerDashboard';
 import OfficerLogin from './pages/OfficerLogin';
 import Dashboard from './pages/Dashboard';
-import { Sprout, Globe, User, PhoneCall, Settings, LogOut, ChevronDown, CreditCard, DollarSign, LogIn } from 'lucide-react';
+import { Sprout, Globe, User, PhoneCall, Settings, LogOut, ChevronDown, CreditCard, DollarSign, LogIn, RefreshCw, ShieldCheck, Building2 } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import smartBotImg from './assets/smart_bot.png';
 
@@ -13,6 +13,10 @@ function NavigationBar() {
   const { lang, changeLanguage, t } = useLanguage();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileRef = useRef(null);
+
+  const [showOfficerMenu, setShowOfficerMenu] = useState(false);
+  const officerProfileRef = useRef(null);
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -23,6 +27,13 @@ function NavigationBar() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return !!localStorage.getItem('farmerMobile') || !!localStorage.getItem('token');
   });
+
+  const [isOfficerLoggedIn, setIsOfficerLoggedIn] = useState(() => {
+    return !!localStorage.getItem('officerToken') || location.pathname === '/officer-dashboard';
+  });
+
+  const officerDistrict = localStorage.getItem('officerDistrict') || 'Khordha';
+  const officerUsername = localStorage.getItem('officerUsername') || 'admin';
 
   // Reactive state for loan profile details from localStorage
   const [loanProfile, setLoanProfile] = useState(() => {
@@ -48,9 +59,13 @@ function NavigationBar() {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
         setShowProfileMenu(false);
       }
+      if (officerProfileRef.current && !officerProfileRef.current.contains(event.target)) {
+        setShowOfficerMenu(false);
+      }
     };
     const syncAuth = () => {
       setIsLoggedIn(!!localStorage.getItem('farmerMobile') || !!localStorage.getItem('token'));
+      setIsOfficerLoggedIn(!!localStorage.getItem('officerToken') || location.pathname === '/officer-dashboard');
       try {
         const saved = localStorage.getItem('farmerLoanProfile');
         setLoanProfile(saved ? JSON.parse(saved) : { has_loan: false });
@@ -95,6 +110,15 @@ function NavigationBar() {
     navigate('/farmer-login');
   };
 
+  const handleOfficerLogout = () => {
+    localStorage.removeItem('officerToken');
+    localStorage.removeItem('officerDistrict');
+    localStorage.removeItem('officerUsername');
+    setIsOfficerLoggedIn(false);
+    setShowOfficerMenu(false);
+    navigate('/officer-login');
+  };
+
   const handleHomeClick = (e) => {
     e.preventDefault();
     localStorage.removeItem('token');
@@ -103,7 +127,15 @@ function NavigationBar() {
     localStorage.removeItem('farmerLoanProfile');
     setIsLoggedIn(false);
     setShowProfileMenu(false);
+
+    localStorage.removeItem('officerToken');
+    localStorage.removeItem('officerDistrict');
+    localStorage.removeItem('officerUsername');
+    setIsOfficerLoggedIn(false);
+    setShowOfficerMenu(false);
+
     window.dispatchEvent(new CustomEvent('farmerLoginUpdated'));
+    window.dispatchEvent(new CustomEvent('officerLoginUpdated'));
     navigate('/');
   };
 
@@ -127,11 +159,16 @@ function NavigationBar() {
             </div>
             <span className={`text-lg sm:text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               {t('nav_brand')}
-              <span className={`ml-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                isDarkMode ? 'text-emerald-300 bg-emerald-950/80 border border-emerald-800' : 'text-emerald-700 bg-emerald-100'
-              }`}>
-                {t('nav_farmer')}
-              </span>
+              {location.pathname === '/farmer-dashboard' && (
+                <span className="ml-1.5 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-emerald-800 bg-emerald-100 border border-emerald-300">
+                  FARMER
+                </span>
+              )}
+              {location.pathname === '/officer-dashboard' && (
+                <span className="ml-1.5 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-blue-800 bg-blue-100 border border-blue-300">
+                  OFFICER
+                </span>
+              )}
             </span>
           </a>
 
@@ -168,8 +205,86 @@ function NavigationBar() {
               {t('home')}
             </a>
 
-            {/* CONDITIONAL AUTHENTICATED PROFILE & LOANS DROPDOWN */}
-            {isLoggedIn ? (
+            {/* Officer Dashboard Refresh Data Button next to Home */}
+            {location.pathname === '/officer-dashboard' && (
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('refreshOfficerDashboard'))}
+                className="flex items-center text-xs font-black px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white transition-all cursor-pointer shadow-xs"
+                title="Refresh Officer Dashboard Data"
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin-hover" />
+                Refresh Data
+              </button>
+            )}
+
+            {/* CONDITIONAL AUTHENTICATED PROFILE DROPDOWN */}
+            {location.pathname === '/officer-dashboard' && isOfficerLoggedIn ? (
+              /* OFFICER LOGGED IN: SHOW OFFICER PROFILE DROPDOWN BADGE */
+              <div className="relative" ref={officerProfileRef}>
+                <button
+                  onClick={() => setShowOfficerMenu(!showOfficerMenu)}
+                  className="flex items-center space-x-2 px-3.5 py-1.5 rounded-full border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-950 font-black text-xs transition-all shadow-xs cursor-pointer"
+                  title="Officer Profile & Jurisdiction Settings"
+                >
+                  <ShieldCheck className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                  <span className="font-black">📍 {officerDistrict} Officer</span>
+                  <ChevronDown className="h-3 w-3 text-blue-600" />
+                </button>
+
+                {/* Officer Profile Dropdown Menu */}
+                {showOfficerMenu && (
+                  <div className="absolute right-0 mt-2 w-72 rounded-2xl shadow-2xl border border-blue-100 bg-white text-gray-800 py-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    {/* Officer Header Info */}
+                    <div className="px-4 py-2 border-b border-gray-100 bg-blue-50/50">
+                      <p className="text-sm font-black text-blue-950 flex items-center">
+                        <ShieldCheck className="h-4 w-4 mr-1.5 text-blue-600" />
+                        {officerUsername}
+                      </p>
+                      <p className="text-[11px] text-blue-700 font-bold mt-0.5">
+                        District Krushi Agriculture Officer
+                      </p>
+                    </div>
+
+                    {/* Jurisdiction Card inside Officer Profile */}
+                    <div className="p-3 my-2 mx-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-1">
+                      <span className="text-[10px] font-black text-blue-900 uppercase block tracking-wider">
+                        Assigned Jurisdiction
+                      </span>
+                      <p className="text-xs font-black text-blue-950 flex items-center">
+                        📍 {officerDistrict} District
+                      </p>
+                      <p className="text-[10px] font-semibold text-emerald-700 flex items-center">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+                        Active Jurisdiction Lock
+                      </p>
+                    </div>
+
+                    {/* Officer Actions */}
+                    <div className="px-3 py-1 space-y-1 text-xs font-semibold">
+                      <button
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent('refreshOfficerDashboard'));
+                          setShowOfficerMenu(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center space-x-2 transition-colors cursor-pointer"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5 text-blue-600" />
+                        <span>Sync District Data</span>
+                      </button>
+                    </div>
+
+                    {/* Officer Logout Button */}
+                    <button
+                      onClick={handleOfficerLogout}
+                      className="w-full text-left px-4 py-2.5 text-xs font-black text-red-600 hover:bg-red-50 flex items-center space-x-2 transition-colors border-t border-gray-100 cursor-pointer mt-1"
+                    >
+                      <LogOut className="h-4 w-4 text-red-500" />
+                      <span>Officer Logout</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : location.pathname === '/farmer-dashboard' && isLoggedIn ? (
               <div className="relative" ref={profileRef}>
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -262,16 +377,7 @@ function NavigationBar() {
                   </div>
                 )}
               </div>
-            ) : (
-              /* BEFORE LOGIN: Clean Sign In Button */
-              <Link
-                to="/farmer-login"
-                className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
-              >
-                <LogIn className="h-3.5 w-3.5 mr-1" />
-                <span>{t('login_btn')}</span>
-              </Link>
-            )}
+            ) : null}
 
           </div>
 
@@ -281,24 +387,64 @@ function NavigationBar() {
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("SmartCrop React Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 max-w-lg mx-auto my-12 bg-white rounded-3xl border border-red-200 shadow-xl text-center space-y-4">
+          <div className="p-3 bg-red-100 text-red-600 rounded-full w-12 h-12 mx-auto flex items-center justify-center font-bold text-xl">
+            ⚠️
+          </div>
+          <h2 className="text-xl font-black text-gray-900">Dashboard UI Notice</h2>
+          <p className="text-xs text-gray-600 font-medium">
+            {this.state.error?.message || "An unexpected error occurred while rendering."}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer"
+          >
+            🔄 Refresh Dashboard
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   return (
-    <LanguageProvider>
-      <Router>
-        <div className="min-h-screen bg-slate-100 font-sans text-gray-900 flex flex-col">
-          <NavigationBar />
-          <main className="flex-1">
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/farmer-login" element={<Login />} />
-              <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
-              <Route path="/officer-login" element={<OfficerLogin />} />
-              <Route path="/officer-dashboard" element={<Dashboard />} />
-            </Routes>
-          </main>
-        </div>
-      </Router>
-    </LanguageProvider>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <Router>
+          <div className="min-h-screen bg-slate-100 font-sans text-gray-900 flex flex-col">
+            <NavigationBar />
+            <main className="flex-1">
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/farmer-login" element={<Login />} />
+                <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
+                <Route path="/officer-login" element={<OfficerLogin />} />
+                <Route path="/officer-dashboard" element={<Dashboard />} />
+              </Routes>
+            </main>
+          </div>
+        </Router>
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 }
 

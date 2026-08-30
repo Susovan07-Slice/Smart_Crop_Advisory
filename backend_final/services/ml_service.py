@@ -9,6 +9,7 @@ from services.yield_prediction_service import predict_yield_and_production
 from services.profit_calculator_service import calculate_cost_revenue_profit, format_indian_currency
 from services.loan_distress_service import calculate_loan_distress
 from services.weather_service import get_weather_for_district
+from services.distress_scorer import calculate_comprehensive_distress_score
 import core.config as config
 
 def recommend_crop(data: CropRecommendationRequest) -> CropRecommendationResponse:
@@ -163,25 +164,22 @@ def run_loan_aware_farm_analysis(
 
         profit_score = round(100.0 * (net_p - min_prof) / prof_range, 1) if max_prof > min_prof else 75.0
 
-        margin = (net_p / item['total_rev']) if item['total_rev'] > 0 else 0.0
-        profit_risk = max(0.0, min(100.0, 100.0 * (1.0 - max(0.0, margin))))
-        climate_risk = 25.0
-        cost_risk = min(100.0, max(0.0, (item['cost_per_ha'] / 1000.0)))
-        market_risk = 20.0
+        weather_wind = float(weather_data.get("wind_speed", 18.0) if isinstance(weather_data, dict) else 18.0)
+        weather_rain_dev = float(weather_data.get("rainfall_deviation", -15.0) if isinstance(weather_data, dict) else -15.0)
 
-        crop_distress_comp = round(
-            config.WEIGHT_PROFIT_RISK * profit_risk +
-            config.WEIGHT_CLIMATE_RISK * climate_risk +
-            config.WEIGHT_COST_RISK * cost_risk +
-            config.WEIGHT_MARKET_RISK * market_risk,
-            1
+        distress_eval = calculate_comprehensive_distress_score(
+            loan_amount=loan_input.original_loan_amount if loan_input.has_loan else 0.0,
+            outstanding_principal=loan_input.outstanding_principal if loan_input.has_loan else 0.0,
+            annual_interest_rate=loan_input.annual_interest_rate if loan_input.has_loan else 7.0,
+            expected_profit=net_p,
+            days_to_loan_due=180,
+            rainfall_deviation_pct=weather_rain_dev,
+            wind_speed_kmh=weather_wind,
+            crop_name=c_name,
+            mandi_price_drop_pct=10.0 if net_p < 0 else 0.0
         )
-
-        final_distress = round(
-            config.WEIGHT_CROP_DISTRESS * crop_distress_comp +
-            config.WEIGHT_LOAN_DISTRESS * loan_distress_score,
-            1
-        )
+        final_distress = distress_eval["distress_score"]
+        crop_distress_comp = distress_eval["breakdown"]["crop_survivability_risk"]
 
         safety_score = round(max(0.0, min(100.0, 100.0 - final_distress)), 1)
 

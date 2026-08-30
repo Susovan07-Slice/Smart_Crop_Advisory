@@ -17,6 +17,59 @@ def get_db():
         db.close()
 
 
+import database
+import models
+
+ODISHA_DISTRICTS_MAP = {
+    "angul": "Angul", "balangir": "Balangir", "balasore": "Balasore", "baleswar": "Balasore",
+    "bargarh": "Bargarh", "bhadrak": "Bhadrak", "boudh": "Boudh", "cuttack": "Cuttack",
+    "deogarh": "Deogarh", "dhenkanal": "Dhenkanal", "gajapati": "Gajapati", "ganjam": "Ganjam",
+    "jagatsinghpur": "Jagatsinghpur", "jajpur": "Jajpur", "jharsuguda": "Jharsuguda",
+    "kalahandi": "Kalahandi", "kandhamal": "Kandhamal", "kendrapara": "Kendrapara",
+    "kendujhar": "Kendujhar", "keonjhar": "Kendujhar", "khordha": "Khordha", "khurda": "Khordha",
+    "koraput": "Koraput", "malkangiri": "Malkangiri", "mayurbhanj": "Mayurbhanj",
+    "nabarangpur": "Nabarangpur", "nayagarh": "Nayagarh", "nuapada": "Nuapada",
+    "puri": "Puri", "rayagada": "Rayagada", "sambalpur": "Sambalpur",
+    "subarnapur": "Subarnapur", "sonepur": "Subarnapur", "sundargarh": "Sundargarh"
+}
+
+def sync_farmer_to_main_db(phone: str, first_name: str, last_name: str, district: str, land_area_ha: float = 2.5, language: str = "en"):
+    main_db = database.SessionLocal()
+    try:
+        farmer_name = f"{first_name} {last_name}".strip()
+        existing = main_db.query(models.Farmer).filter(models.Farmer.phone == phone).first()
+        if existing:
+            existing.name = farmer_name
+            existing.district = district
+            existing.language = language
+        else:
+            new_farmer = models.Farmer(
+                name=farmer_name,
+                phone=phone,
+                language=language,
+                district=district,
+                crop="Paddy",
+                soil_type="Alluvial",
+                loan_amount=50000.0,
+                days_to_loan_due=60
+            )
+            main_db.add(new_farmer)
+            main_db.flush()
+            new_record = models.FarmerRecord(
+                farmer_id=new_farmer.id,
+                rainfall_deviation_percent=-15.0,
+                mandi_price_drop_percent=12.0,
+                distress_score=45.0
+            )
+            main_db.add(new_record)
+        main_db.commit()
+    except Exception as e:
+        main_db.rollback()
+        print(f"Error syncing farmer to main DB: {e}")
+    finally:
+        main_db.close()
+
+
 @router.post("/auth/check-mobile", response_model=schemas.PhoneCheckResponse)
 def check_mobile(req: schemas.PhoneCheckRequest, db: Session = Depends(get_db)):
     phone = "".join(filter(str.isdigit, req.phone.strip()))
@@ -55,7 +108,6 @@ def register_pin(req: schemas.PinRegisterRequest, db: Session = Depends(get_db))
 
     existing = db.query(FarmerLoginDetails).filter(FarmerLoginDetails.phone == phone).first()
     if existing:
-        # Update existing profile and PIN
         existing.pin = pin
         existing.first_name = first_name if first_name != "Farmer" else (existing.first_name or first_name)
         existing.last_name = last_name if last_name != phone[-4:] else (existing.last_name or last_name)
@@ -65,7 +117,6 @@ def register_pin(req: schemas.PinRegisterRequest, db: Session = Depends(get_db))
         existing.preferred_language = pref_lang or existing.preferred_language or "en"
         farmer = existing
     else:
-        # Create new farmer login details record in SQLite login_details.db
         farmer = FarmerLoginDetails(
             phone=phone,
             pin=pin,
@@ -81,6 +132,9 @@ def register_pin(req: schemas.PinRegisterRequest, db: Session = Depends(get_db))
     db.commit()
     db.refresh(farmer)
     
+    # Synchronize to main DB (smartcrop.db)
+    sync_farmer_to_main_db(farmer.phone, farmer.first_name, farmer.last_name, farmer.district, farmer.land_area_ha, farmer.preferred_language)
+
     token = f"smartcrop-farmer-token-{secrets.token_hex(16)}"
     return {
         "status": "success",
@@ -115,12 +169,14 @@ def login_pin(req: schemas.PinLoginRequest, db: Session = Depends(get_db)):
             detail=f"Mobile number {phone} is not registered yet. Click 'Sign Up' below to create your account in 5 seconds!"
         )
         
-    # Strict PIN verification matching login_details.db record
     if farmer.pin != pin:
         raise HTTPException(
             status_code=401, 
             detail="Incorrect 4-digit PIN. Please enter your registered PIN."
         )
+
+    # Ensure main DB sync exists
+    sync_farmer_to_main_db(farmer.phone, farmer.first_name, farmer.last_name, farmer.district, farmer.land_area_ha, farmer.preferred_language)
         
     token = f"smartcrop-farmer-token-{secrets.token_hex(16)}"
     return {
@@ -162,6 +218,49 @@ def get_farmer_profile(phone: str, db: Session = Depends(get_db)):
     }
 
 
+@router.post("/auth/update-district")
+def update_district(req: dict, db: Session = Depends(get_db)):
+    phone = "".join(filter(str.isdigit, str(req.get("phone", "")).strip()))
+    new_district = str(req.get("district", "")).strip()
+    if not phone or not new_district:
+        raise HTTPException(status_code=400, detail="Phone and district are required.")
+        
+    clean_10 = phone[-10:] if len(phone) >= 10 else phone
+
+    # 1. Update in FarmerLoginDetails (login_details.db)
+    farmer_login = db.query(FarmerLoginDetails).filter(FarmerLoginDetails.phone.like(f"%{clean_10}%")).first()
+    first_name = "Farmer"
+    last_name = clean_10[-4:]
+    land_area = 2.5
+    lang = "en"
+    
+    if farmer_login:
+        farmer_login.district = new_district
+        first_name = farmer_login.first_name or first_name
+        last_name = farmer_login.last_name or last_name
+        land_area = farmer_login.land_area_ha or land_area
+        lang = farmer_login.preferred_language or lang
+        db.commit()
+    
+    # 2. Direct update in main smartcrop.db (models.Farmer)
+    main_db = database.SessionLocal()
+    try:
+        main_farmers = main_db.query(models.Farmer).filter(models.Farmer.phone.like(f"%{clean_10}%")).all()
+        if main_farmers:
+            for mf in main_farmers:
+                mf.district = new_district
+            main_db.commit()
+        else:
+            sync_farmer_to_main_db(phone, first_name, last_name, new_district, land_area, lang)
+    except Exception as e:
+        main_db.rollback()
+        print(f"Error updating main farmer district: {e}")
+    finally:
+        main_db.close()
+        
+    return {"status": "success", "message": f"District relocated to {new_district} for farmer {phone}"}
+
+
 # Retain OTP Request & Verify for legacy compatibility
 @router.post("/auth/request-otp", response_model=schemas.OTPResponse)
 def request_otp(req: schemas.OTPRequest, db: Session = Depends(get_db)):
@@ -192,6 +291,9 @@ def verify_otp(req: schemas.OTPVerify, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(farmer)
             
+    if farmer:
+        sync_farmer_to_main_db(farmer.phone, farmer.first_name, farmer.last_name, farmer.district or "Cuttack", farmer.land_area_ha or 2.5, "en")
+
     token = f"smartcrop-farmer-token-{secrets.token_hex(16)}"
     return {
         "status": "success",
@@ -212,10 +314,38 @@ def verify_otp(req: schemas.OTPVerify, db: Session = Depends(get_db)):
 
 @router.post("/auth/officer-login")
 def officer_login(req: schemas.OfficerLogin):
-    if req.username == "admin" and req.password == "123":
+    username = req.username.strip().lower()
+    password = req.password.strip()
+
+    if password != "123":
+        raise HTTPException(status_code=401, detail="Invalid credentials. Password must be 123.")
+
+    if username == "admin":
         return {
-            "status": "success", 
+            "status": "success",
             "token": f"smartcrop-officer-token-{secrets.token_hex(16)}",
-            "role": "officer"
+            "role": "officer",
+            "district": "Khordha",
+            "username": "admin"
         }
-    raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if username.startswith("admin_"):
+        raw_dist = username[6:].strip()
+        matched_district = ODISHA_DISTRICTS_MAP.get(raw_dist, raw_dist.capitalize())
+        return {
+            "status": "success",
+            "token": f"smartcrop-officer-token-{secrets.token_hex(16)}",
+            "role": "officer",
+            "district": matched_district,
+            "username": req.username
+        }
+
+    matched_district = ODISHA_DISTRICTS_MAP.get(username, "Khordha")
+    return {
+        "status": "success",
+        "token": f"smartcrop-officer-token-{secrets.token_hex(16)}",
+        "role": "officer",
+        "district": matched_district,
+        "username": req.username
+    }
+
