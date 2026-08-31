@@ -50,6 +50,7 @@ const OfficerLogin = () => {
     } catch (err) {
       const isCloudOrUnreachable = !err.response || 
                                    err.response.status === 404 || 
+                                   err.response.status === 405 || 
                                    err.response.status >= 500 || 
                                    err.code === 'ERR_NETWORK' || 
                                    err.message?.includes('Network Error');

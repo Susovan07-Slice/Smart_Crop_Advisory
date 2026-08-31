@@ -32,6 +32,10 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
+    if (error.response && error.response.status === 405) {
+      error.isVercelHtmlFallback = true;
+      error.response.status = 404; // Mock 404 so existing catch blocks handle it
+    }
     return Promise.reject(error);
   }
 );
